@@ -89,6 +89,14 @@ export default function Terminal() {
       <style>{`*{box-sizing:border-box;} a{color:inherit;} ::placeholder{color:${color.textFaint};}`}</style>
 
       <div style={{ maxWidth: "560px", margin: "0 auto", padding: "50px 0 90px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+          <Link href="/">
+            <a style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
+              <img src="/croclogo.jpg" alt="CrocPad" style={{ width: "24px", height: "24px", borderRadius: "6px", objectFit: "cover", border: `1px solid ${color.border}` }} />
+              <span style={{ fontFamily: font.display, fontWeight: 700, fontSize: "0.85rem", color: color.text }}>CROCPAD</span>
+            </a>
+          </Link>
+        </div>
         <Link href="/">
           <a style={{ fontFamily: font.mono, fontSize: "0.66rem", letterSpacing: "0.1em", textTransform: "uppercase", color: color.textMuted, textDecoration: "none" }}>
             ← Back to CrocPad
