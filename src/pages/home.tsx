@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { color, font, loadFonts, X_URL } from "@/lib/theme";
 import { IconX } from "@/components/icons";
 import WaitlistModal from "@/components/waitlist-modal";
+import SignInButton from "@/components/sign-in-button";
 
 /* ───────────────────────── small icons (no emoji) ───────────────────────── */
 
@@ -167,22 +168,20 @@ export default function Home() {
         }}
       >
         <a href="#top" style={{ display: "flex", alignItems: "center", gap: "9px", textDecoration: "none" }}>
-          <div style={{ width: "28px", height: "28px", borderRadius: "7px", background: color.lime, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontFamily: font.mono, fontWeight: 700, fontSize: "0.85rem", color: color.bg }}>C</span>
-          </div>
+          <img
+            src="/croclogo.jpg"
+            alt="CrocPad"
+            style={{ width: "30px", height: "30px", borderRadius: "8px", objectFit: "cover", border: `1px solid ${color.border}` }}
+          />
           <span style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1rem", letterSpacing: "0.02em" }}>CROCPAD</span>
         </a>
 
-        <nav style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <nav style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <a href={X_URL} target="_blank" rel="noopener noreferrer" title="Follow on X"
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "7px", color: color.textMuted, border: `1px solid ${color.border}`, marginRight: "8px" }}>
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "32px", height: "32px", borderRadius: "7px", color: color.textMuted, border: `1px solid ${color.border}` }}>
             <IconX />
           </a>
-          <Link href="/terminal">
-            <a style={{ fontFamily: font.mono, fontSize: "0.66rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: color.bg, background: color.lime, borderRadius: "7px", padding: "9px 16px", textDecoration: "none" }}>
-              Gator Terminal
-            </a>
-          </Link>
+          <SignInButton />
         </nav>
       </header>
 
@@ -219,11 +218,28 @@ export default function Home() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", width: "100%", maxWidth: "300px" }}>
           <Link href="/terminal">
-            <a style={{ fontFamily: font.mono, fontWeight: 600, fontSize: "0.78rem", letterSpacing: "0.1em", textTransform: "uppercase", color: color.bg, background: color.lime, borderRadius: "8px", padding: "16px", textAlign: "center", textDecoration: "none" }}>
+            <a
+              style={{
+                fontFamily: font.mono, fontWeight: 600, fontSize: "0.78rem", letterSpacing: "0.1em", textTransform: "uppercase",
+                color: color.bg, background: color.lime, borderRadius: "8px", padding: "16px", textAlign: "center", textDecoration: "none",
+                boxShadow: `0 8px 28px ${color.lime}26`, transition: "transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease",
+              }}
+              onMouseEnter={(e) => { const el = e.currentTarget as HTMLAnchorElement; el.style.transform = "translateY(-2px)"; el.style.boxShadow = `0 12px 32px ${color.lime}3a`; el.style.filter = "brightness(1.06)"; }}
+              onMouseLeave={(e) => { const el = e.currentTarget as HTMLAnchorElement; el.style.transform = "translateY(0)"; el.style.boxShadow = `0 8px 28px ${color.lime}26`; el.style.filter = "none"; }}
+            >
               Enter Gator Terminal
             </a>
           </Link>
-          <button onClick={() => setModalOpen(true)} style={{ fontFamily: font.mono, fontWeight: 600, fontSize: "0.76rem", letterSpacing: "0.1em", textTransform: "uppercase", color: color.text, background: "transparent", border: `1px solid ${color.borderStrong}`, borderRadius: "8px", padding: "16px", cursor: "pointer" }}>
+          <button
+            onClick={() => setModalOpen(true)}
+            style={{
+              fontFamily: font.mono, fontWeight: 600, fontSize: "0.76rem", letterSpacing: "0.1em", textTransform: "uppercase",
+              color: color.text, background: "transparent", border: `1px solid ${color.borderStrong}`, borderRadius: "8px",
+              padding: "16px", cursor: "pointer", transition: "border-color 0.15s ease, background 0.15s ease",
+            }}
+            onMouseEnter={(e) => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = color.lime; el.style.background = "rgba(198,255,61,0.05)"; }}
+            onMouseLeave={(e) => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = color.borderStrong; el.style.background = "transparent"; }}
+          >
             Apply for Waitlist
           </button>
         </div>
@@ -341,9 +357,11 @@ export default function Home() {
 
       {/* ───────── footer ───────── */}
       <footer style={{ borderTop: `1px solid ${color.border}`, padding: "50px 20px 36px", textAlign: "center" }}>
-        <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: color.lime, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
-          <span style={{ fontFamily: font.mono, fontWeight: 700, fontSize: "0.95rem", color: color.bg }}>C</span>
-        </div>
+        <img
+          src="/croclogo.jpg"
+          alt="CrocPad"
+          style={{ width: "36px", height: "36px", borderRadius: "9px", objectFit: "cover", border: `1px solid ${color.border}`, margin: "0 auto 14px", display: "block" }}
+        />
         <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.1rem", margin: "0 0 6px" }}>CROCPAD</p>
         <p style={{ fontSize: "0.8rem", color: color.textFaint, margin: "0 0 24px" }}>Native launchpad for Robinhood Chain.</p>
         <div style={{ display: "flex", gap: "22px", justifyContent: "center", marginBottom: "26px", flexWrap: "wrap" }}>
