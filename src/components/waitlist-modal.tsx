@@ -44,21 +44,59 @@ function QLabel({ n, children }: { n: string; children: React.ReactNode }) {
   );
 }
 
-function TextQuestion({
-  n, label, value, onChange, placeholder,
+function CheckOption({ label, checked, onClick }: { label: string; checked: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex", alignItems: "center", gap: "10px", width: "100%", textAlign: "left",
+        background: checked ? "rgba(198,255,61,0.08)" : "transparent",
+        border: `1px solid ${checked ? color.lime : color.border}`,
+        borderRadius: "8px", padding: "11px 12px", cursor: "pointer", marginBottom: "8px",
+        transition: "all 0.15s ease",
+      }}
+    >
+      <span
+        style={{
+          flexShrink: 0, width: "18px", height: "18px", borderRadius: "5px",
+          border: `1.5px solid ${checked ? color.lime : color.borderStrong}`,
+          background: checked ? color.lime : "transparent",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        {checked && <IconCheck size={11} />}
+      </span>
+      <span style={{ fontSize: "0.82rem", color: color.text, lineHeight: 1.35 }}>{label}</span>
+    </button>
+  );
+}
+
+function MultiSelectQuestion({
+  n, label, options, selected, onToggle,
 }: {
-  n: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+  n: string; label: string; options: string[]; selected: string[]; onToggle: (o: string) => void;
 }) {
   return (
     <div style={{ marginBottom: "22px" }}>
       <QLabel n={n}>{label}</QLabel>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder ?? "Type your answer..."}
-        rows={3}
-        style={inputStyle}
-      />
+      {options.map((o) => (
+        <CheckOption key={o} label={o} checked={selected.includes(o)} onClick={() => onToggle(o)} />
+      ))}
+    </div>
+  );
+}
+
+function SingleSelectQuestion({
+  n, label, options, selected, onSelect,
+}: {
+  n: string; label: string; options: string[]; selected: string; onSelect: (o: string) => void;
+}) {
+  return (
+    <div style={{ marginBottom: "22px" }}>
+      <QLabel n={n}>{label}</QLabel>
+      {options.map((o) => (
+        <CheckOption key={o} label={o} checked={selected === o} onClick={() => onSelect(o)} />
+      ))}
     </div>
   );
 }
@@ -99,11 +137,10 @@ function YesNoQuestion({
       </div>
       {value === true && (
         <div style={{ animation: "revealDown 0.3s ease both" }}>
-          <textarea
+          <input
             value={detailValue}
             onChange={(e) => onDetailChange(e.target.value)}
             placeholder={detailPlaceholder}
-            rows={2}
             style={inputStyle}
           />
         </div>
@@ -157,20 +194,32 @@ function TaskRow({
 
 /* ═══════════════════════════ MAIN ═══════════════════════════ */
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 2;
+
+const INTEREST_OPTIONS = [
+  "Interested in launching with CrocPad",
+  "Interested in the upcoming NFT drop",
+  "Interested in a potential airdrop",
+];
+
+const DESCRIBES_YOU_OPTIONS = ["Creator", "Collector", "Builder/Developer", "New to Web3"];
+
+const SUPPORT_OPTIONS = [
+  "Hold my NFT.",
+  "Be active in the community.",
+  "Create content (memes, posts, videos).",
+  "Provide feedback.",
+  "Build tools or integrations.",
+];
 
 export default function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState(0);
-  const [direction, setDirection] = useState<"forward" | "back">("forward");
 
-  const [why, setWhy] = useState("");
-  const [valuable, setValuable] = useState("");
-  const [isCollector, setIsCollector] = useState<boolean | null>(null);
-  const [collectorDetail, setCollectorDetail] = useState("");
-
+  const [interests, setInterests] = useState<string[]>([]);
+  const [describesYou, setDescribesYou] = useState("");
   const [hasContributed, setHasContributed] = useState<boolean | null>(null);
-  const [contributedDetail, setContributedDetail] = useState("");
-  const [supportPlan, setSupportPlan] = useState("");
+  const [contributedProject, setContributedProject] = useState("");
+  const [supportPlans, setSupportPlans] = useState<string[]>([]);
 
   const [followed, setFollowed] = useState(false);
   const [followConfirmed, setFollowConfirmed] = useState(false);
@@ -189,16 +238,14 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("crocpad_wl_draft_v2");
+      const saved = localStorage.getItem("crocpad_wl_draft_v3");
       if (saved) {
         const p = JSON.parse(saved);
-        setWhy(p.why ?? "");
-        setValuable(p.valuable ?? "");
-        setIsCollector(p.isCollector ?? null);
-        setCollectorDetail(p.collectorDetail ?? "");
+        setInterests(p.interests ?? []);
+        setDescribesYou(p.describesYou ?? "");
         setHasContributed(p.hasContributed ?? null);
-        setContributedDetail(p.contributedDetail ?? "");
-        setSupportPlan(p.supportPlan ?? "");
+        setContributedProject(p.contributedProject ?? "");
+        setSupportPlans(p.supportPlans ?? []);
         setCommentUrl(p.commentUrl ?? "");
         setTwitterUsername(p.twitterUsername ?? "");
         setWallet(p.wallet ?? "");
@@ -212,26 +259,29 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
   useEffect(() => {
     try {
       localStorage.setItem(
-        "crocpad_wl_draft_v2",
-        JSON.stringify({ why, valuable, isCollector, collectorDetail, hasContributed, contributedDetail, supportPlan, commentUrl, twitterUsername, wallet })
+        "crocpad_wl_draft_v3",
+        JSON.stringify({ interests, describesYou, hasContributed, contributedProject, supportPlans, commentUrl, twitterUsername, wallet })
       );
     } catch {
       /* ignore */
     }
-  }, [why, valuable, isCollector, collectorDetail, hasContributed, contributedDetail, supportPlan, commentUrl, twitterUsername, wallet]);
+  }, [interests, describesYou, hasContributed, contributedProject, supportPlans, commentUrl, twitterUsername, wallet]);
+
+  function toggleInterest(o: string) {
+    setInterests((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]));
+  }
+  function toggleSupport(o: string) {
+    setSupportPlans((prev) => (prev.includes(o) ? prev.filter((x) => x !== o) : [...prev, o]));
+  }
 
   const step0Valid =
-    why.trim().length > 0 &&
-    valuable.trim().length > 0 &&
-    isCollector !== null &&
-    (isCollector === false || collectorDetail.trim().length > 0);
+    interests.length > 0 &&
+    describesYou !== "" &&
+    hasContributed !== null &&
+    (hasContributed === false || contributedProject.trim().length > 0) &&
+    supportPlans.length > 0;
 
   const step1Valid =
-    hasContributed !== null &&
-    (hasContributed === false || contributedDetail.trim().length > 0) &&
-    supportPlan.trim().length > 0;
-
-  const step2Valid =
     followConfirmed &&
     likeConfirmed &&
     commentConfirmed &&
@@ -240,20 +290,18 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
     walletConfirmed &&
     isValidEvm(wallet);
 
-  const stepValid = [step0Valid, step1Valid, step2Valid][step];
+  const stepValid = [step0Valid, step1Valid][step];
 
   function goNext() {
     if (!stepValid) return;
-    setDirection("forward");
     setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
   }
   function goBack() {
-    setDirection("back");
     setStep((s) => Math.max(s - 1, 0));
   }
 
   async function submit() {
-    if (!step2Valid) {
+    if (!step1Valid) {
       setErr("Complete every step before submitting.");
       return;
     }
@@ -270,13 +318,11 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
         followed: true,
         liked: true,
         comment_url: commentUrl.trim(),
-        why_whitelisted: why.trim(),
-        valuable_member: valuable.trim(),
-        is_collector: isCollector,
-        collector_detail: isCollector ? collectorDetail.trim() : null,
+        interests,
+        describes_you: describesYou,
         has_contributed: hasContributed,
-        contributed_detail: hasContributed ? contributedDetail.trim() : null,
-        support_plan: supportPlan.trim(),
+        contributed_project: hasContributed ? contributedProject.trim() : null,
+        support_plans: supportPlans,
       },
     ]);
     setSending(false);
@@ -358,7 +404,7 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
                 Waitlist Application
               </p>
               <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.25rem", margin: "0 0 14px", color: color.text }}>
-                {step < 2 ? "Tell us about you" : "Verify & submit"}
+                {step === 0 ? "Tell us about you" : "Verify & submit"}
               </p>
               <div style={{ display: "flex", gap: "6px", marginBottom: "6px" }}>
                 {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
@@ -380,39 +426,44 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
                   transition: "transform 0.42s cubic-bezier(0.65,0,0.35,1)",
                 }}
               >
-                {/* step 0 */}
+                {/* step 0 — the 4 questions */}
                 <div style={{ width: `${100 / TOTAL_STEPS}%`, padding: "0 22px 4px", boxSizing: "border-box", overflowY: "auto", maxHeight: "58vh" }}>
-                  <TextQuestion n="01" label="Why do you want to be whitelisted for this project?" value={why} onChange={setWhy} />
-                  <TextQuestion n="02" label="What makes you a valuable member of our community?" value={valuable} onChange={setValuable} />
+                  <MultiSelectQuestion
+                    n="01"
+                    label="What interests you with the upcoming launch?"
+                    options={INTEREST_OPTIONS}
+                    selected={interests}
+                    onToggle={toggleInterest}
+                  />
+                  <SingleSelectQuestion
+                    n="02"
+                    label="Which best describes you?"
+                    options={DESCRIBES_YOU_OPTIONS}
+                    selected={describesYou}
+                    onSelect={setDescribesYou}
+                  />
                   <YesNoQuestion
                     n="03"
-                    label="Are you an NFT collector?"
-                    value={isCollector}
-                    onChange={setIsCollector}
-                    detailValue={collectorDetail}
-                    onDetailChange={setCollectorDetail}
-                    detailPlaceholder="Which chains or collections do you mainly collect?"
-                  />
-                </div>
-
-                {/* step 1 */}
-                <div style={{ width: `${100 / TOTAL_STEPS}%`, padding: "0 22px 4px", boxSizing: "border-box", overflowY: "auto", maxHeight: "58vh" }}>
-                  <YesNoQuestion
-                    n="04"
                     label="Have you launched or contributed to an NFT or Web3 project before?"
                     value={hasContributed}
                     onChange={setHasContributed}
-                    detailValue={contributedDetail}
-                    onDetailChange={setContributedDetail}
-                    detailPlaceholder="Tell us about it."
+                    detailValue={contributedProject}
+                    onDetailChange={setContributedProject}
+                    detailPlaceholder="Name of the project"
                   />
-                  <TextQuestion n="05" label="How do you plan to support our project after mint?" value={supportPlan} onChange={setSupportPlan} />
+                  <MultiSelectQuestion
+                    n="04"
+                    label="How do you plan to support this project after mint?"
+                    options={SUPPORT_OPTIONS}
+                    selected={supportPlans}
+                    onToggle={toggleSupport}
+                  />
                 </div>
 
-                {/* step 2 — tasks + identity */}
+                {/* step 1 — tasks + identity */}
                 <div style={{ width: `${100 / TOTAL_STEPS}%`, padding: "0 22px 4px", boxSizing: "border-box", overflowY: "auto", maxHeight: "58vh" }}>
                   <TaskRow
-                    label="STEP 06 — Follow us on X"
+                    label="STEP 05 — Follow us on X"
                     actionLabel="Follow"
                     actionHref={X_URL}
                     confirmed={followConfirmed}
@@ -421,7 +472,7 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
                     onConfirm={() => setFollowConfirmed(true)}
                   />
                   <TaskRow
-                    label="STEP 07 — Like the pinned post"
+                    label="STEP 06 — Like the pinned post"
                     actionLabel="Open post"
                     actionHref={PINNED_TWEET_URL}
                     confirmed={likeConfirmed}
@@ -431,7 +482,7 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
                   />
                   <div style={{ border: `1px solid ${color.border}`, borderRadius: "10px", padding: "14px", marginBottom: "10px" }}>
                     <p style={{ margin: "0 0 8px", fontFamily: font.mono, fontSize: "0.68rem", letterSpacing: "0.06em", color: color.textMuted }}>
-                      STEP 08 — Comment and tag two friends
+                      STEP 07 — Comment and tag two friends
                     </p>
                     <a href={PINNED_TWEET_URL} target="_blank" rel="noopener noreferrer"
                       style={{ display: "block", textAlign: "center", fontFamily: font.mono, fontSize: "0.64rem", letterSpacing: "0.06em", textTransform: "uppercase", color: color.text, border: `1px solid ${color.borderStrong}`, borderRadius: "7px", padding: "9px", textDecoration: "none", marginBottom: "8px" }}>
@@ -451,12 +502,12 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
                   </div>
 
                   <div style={{ marginBottom: "12px" }}>
-                    <QLabel n="09">What is your X (Twitter) username?</QLabel>
+                    <QLabel n="08">What is your X (Twitter) username?</QLabel>
                     <input placeholder="@yourhandle" value={twitterUsername} onChange={(e) => setTwitterUsername(e.target.value)} style={{ ...inputStyle, fontFamily: font.mono }} />
                   </div>
 
                   <div style={{ marginBottom: "6px" }}>
-                    <QLabel n="10">What is your wallet address?</QLabel>
+                    <QLabel n="09">What is your wallet address?</QLabel>
                     <input placeholder="0x..." value={wallet} disabled={walletConfirmed} onChange={(e) => setWallet(e.target.value)} style={{ ...inputStyle, fontFamily: font.mono }} />
                     {wallet && !isValidEvm(wallet) && (
                       <p style={{ fontSize: "0.66rem", color: color.danger, margin: "6px 0 0" }}>Not a valid EVM address.</p>
@@ -506,15 +557,15 @@ export default function WaitlistModal({ open, onClose }: { open: boolean; onClos
                   </button>
                 ) : (
                   <button
-                    disabled={!step2Valid || sending}
+                    disabled={!step1Valid || sending}
                     onClick={submit}
                     style={{
                       flex: 1,
                       fontFamily: font.mono, fontWeight: 600, fontSize: "0.72rem", letterSpacing: "0.1em", textTransform: "uppercase",
-                      color: step2Valid ? color.bg : color.textFaint,
-                      background: step2Valid ? color.lime : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${step2Valid ? color.lime : color.border}`,
-                      borderRadius: "8px", padding: "14px", cursor: step2Valid && !sending ? "pointer" : "not-allowed",
+                      color: step1Valid ? color.bg : color.textFaint,
+                      background: step1Valid ? color.lime : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${step1Valid ? color.lime : color.border}`,
+                      borderRadius: "8px", padding: "14px", cursor: step1Valid && !sending ? "pointer" : "not-allowed",
                     }}
                   >
                     {sending ? "Submitting..." : "Submit application"}
