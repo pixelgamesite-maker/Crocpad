@@ -46,5 +46,4 @@ export function loadFonts() {
 
 export const X_URL = "https://x.com/CrocpadRBH";
 
-// Placeholder — swap for the real pinned tweet URL when it's live.
-export const PINNED_TWEET_URL = "https://x.com/CrocpadRBH/status/PLACEHOLDER";
+export const PINNED_TWEET_URL = "https://x.com/i/status/2077071416231346359";
