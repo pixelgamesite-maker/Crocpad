@@ -46,4 +46,4 @@ export function loadFonts() {
 
 export const X_URL = "https://x.com/CrocpadRBH";
 
-export const PINNED_TWEET_URL = "https://x.com/i/status/2077071416231346359";
+export const PINNED_TWEET_URL = "https://x.com/CrocpadRBH/status/2080685481390403818";
