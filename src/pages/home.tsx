@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
-import { color, font, loadFonts, X_URL } from "@/lib/theme";
+import { color, font, loadFonts, X_URL, WAITLIST_OPEN } from "@/lib/theme";
+import { useToast } from "@/hooks/use-toast";
 import { IconX } from "@/components/icons";
 import WaitlistModal from "@/components/waitlist-modal";
 import SignInButton from "@/components/sign-in-button";
@@ -139,6 +140,15 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const { lines, typing } = useBootSequence();
   const [modalOpen, setModalOpen] = useState(false);
+  const { toast } = useToast();
+
+  function handleWaitlistClick() {
+    if (!WAITLIST_OPEN) {
+      toast({ description: "Whitelist Phase One application is closed." });
+      return;
+    }
+    setModalOpen(true);
+  }
 
   useEffect(() => {
     loadFonts();
@@ -231,7 +241,7 @@ export default function Home() {
             </a>
           </Link>
           <button
-            onClick={() => setModalOpen(true)}
+            onClick={handleWaitlistClick}
             style={{
               fontFamily: font.mono, fontWeight: 600, fontSize: "0.76rem", letterSpacing: "0.1em", textTransform: "uppercase",
               color: color.text, background: "transparent", border: `1px solid ${color.borderStrong}`, borderRadius: "8px",
@@ -348,7 +358,7 @@ export default function Home() {
               A limited number of wallets get early access to CrocPad launches. Answer a few
               questions and complete three quick steps on X to apply.
             </p>
-            <button onClick={() => setModalOpen(true)} style={{ fontFamily: font.mono, fontWeight: 600, fontSize: "0.76rem", letterSpacing: "0.1em", textTransform: "uppercase", color: color.bg, background: color.lime, border: "none", borderRadius: "8px", padding: "16px 34px", cursor: "pointer" }}>
+            <button onClick={handleWaitlistClick} style={{ fontFamily: font.mono, fontWeight: 600, fontSize: "0.76rem", letterSpacing: "0.1em", textTransform: "uppercase", color: color.bg, background: color.lime, border: "none", borderRadius: "8px", padding: "16px 34px", cursor: "pointer" }}>
               Apply for Waitlist
             </button>
           </div>
