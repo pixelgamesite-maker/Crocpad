@@ -46,4 +46,9 @@ export function loadFonts() {
 
 export const X_URL = "https://x.com/CrocpadRBH";
 
-export const PINNED_TWEET_URL = "https://x.com/CrocpadRBH/status/2080685481390403818";
+// Toggle this to false to lock the whitelist wizard against new
+// submissions (e.g. once a phase has ended). Existing applicants who
+// already submitted still see their confirmation screen regardless.
+export const WAITLIST_OPEN = false;
+
+export const PINNED_TWEET_URL = "https://x.com/i/status/2077071416231346359";
