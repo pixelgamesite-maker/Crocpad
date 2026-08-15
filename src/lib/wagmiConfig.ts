@@ -1,4 +1,13 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import {
+  metaMaskWallet,
+  zerionWallet,
+  rainbowWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  trustWallet,
+  injectedWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { defineChain } from "viem";
 
 // Robinhood Chain mainnet, per official docs.
@@ -31,4 +40,16 @@ export const wagmiConfig = getDefaultConfig({
   projectId: "YOUR_WALLETCONNECT_PROJECT_ID",
   chains: [robinhoodChain, robinhoodChainTestnet],
   ssr: false,
+  wallets: [
+    {
+      groupName: "Popular",
+      wallets: [metaMaskWallet, zerionWallet, rainbowWallet, coinbaseWallet, trustWallet, walletConnectWallet],
+    },
+    {
+      // Catches any other injected wallet extension (Rabby, Brave Wallet,
+      // etc.) that isn't explicitly listed above.
+      groupName: "Other",
+      wallets: [injectedWallet],
+    },
+  ],
 });
