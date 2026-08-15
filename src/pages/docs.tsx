@@ -107,7 +107,7 @@ export default function Docs() {
       <Section id="overview" n="01" title="Overview">
         <P>
           CrocPad is a token and NFT launchpad built for Robinhood Chain. Creators configure
-          a launch from a form — supply, pricing, phases — and the contract deploys without
+          a launch from a form — supply, pricing, phases, and the contract deploys without
           anyone writing Solidity.
         </P>
         <P>
@@ -139,7 +139,7 @@ export default function Docs() {
         <div style={{ border: RULE, background: color.paper, marginTop: "20px" }}>
           {[
             { name: "Whitelist", price: "Free + 0.00003 ETH fee", cap: "2 per wallet", note: "Merkle allowlist. Eligibility is checked against your connected wallet." },
-            { name: "Public", price: "0.0005 ETH + 0.00003 ETH fee", cap: "No practical per-wallet cap", note: "Open to anyone. Bounded only by remaining supply." },
+            { name: "Public", price: "0.0006 ETH + 0.00003 ETH fee", cap: "No practical per-wallet cap", note: "Open to anyone. Bounded only by remaining supply." },
           ].map((p, i) => (
             <div key={p.name} style={{ padding: "16px 18px", borderBottom: i === 0 ? RULE : "none" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "6px" }}>
@@ -195,7 +195,7 @@ export default function Docs() {
         </P>
         <P>
           Buying a trait gives you a separate token. Equipping it onto a Croc updates that
-          Croc's artwork, but the trait stays yours — it isn't burned or locked, and you can
+          Croc's artwork, but the trait stays yours, it isn't burned or locked, and you can
           unequip and resell it at any time.
         </P>
         <P>
