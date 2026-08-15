@@ -36,14 +36,14 @@ const PILLARS = [
 const SPECS: [string, string][] = [
   ["Supply", "6,000"],
   ["Allowlist", "Free"],
-  ["Public", "0.0005 ETH"],
+  ["Public", "0.0006 ETH"],
   ["Chain", "Robinhood"],
 ];
 
 const SUPPLY_ROWS = [
   { label: "Team", count: "150", accent: color.inkSoft, note: "Reserved. Minted by the team, never sold." },
   { label: "Whitelist", count: "4,000", accent: color.croc, note: "Free to mint, 2 per wallet." },
-  { label: "Public", count: "1,850+", accent: color.sun, note: "0.0005 ETH." },
+  { label: "Public", count: "1,850+", accent: color.sun, note: "0.0006 ETH." },
 ];
 
 export default function Home() {
@@ -77,7 +77,7 @@ export default function Home() {
 
             <p style={{ fontSize: "1.1rem", lineHeight: 1.55, color: color.inkSoft, margin: "0 0 32px", maxWidth: "44ch" }}>
               CrocPad is a token and NFT launchpad built natively for Robinhood Chain.
-              It starts with Crocs — 6,000 hand-drawn genesis characters.
+              It starts with Crocs 6,000 hand-drawn genesis characters.
             </p>
 
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
