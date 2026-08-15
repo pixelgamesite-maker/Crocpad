@@ -5,35 +5,26 @@ import { color, font, RULE, offset } from "@/lib/theme";
 import { CROCSPAD_ADDRESS, CROCSPAD_ABI, ALLOWLIST_API_URL, PHASE } from "@/lib/crocsPadContract";
 import CrocFrame from "@/components/croc-frame";
 import MintFeed from "@/components/mint-feed";
+import PhaseTracks from "@/components/phase-tracks";
+import TeamMint from "@/components/team-mint";
 
 const PHASE_LABEL: Record<number, string> = {
   [PHASE.CLOSED]: "Not open",
-  [PHASE.ALLOWLIST]: "Allowlist",
-  [PHASE.PUBLIC]: "Public",
+  [PHASE.ALLOWLIST]: "Whitelist live",
+  [PHASE.PUBLIC]: "Public live",
 };
 
-function Stat({ label, value, accent }: { label: string; value: React.ReactNode; accent?: string }) {
-  return (
-    <div style={{ padding: "16px 18px", borderRight: RULE, flex: 1, minWidth: 0 }}>
-      <p style={{ fontFamily: font.mono, fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 8px" }}>
-        {label}
-      </p>
-      <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.3rem", margin: 0, letterSpacing: "-0.02em", color: accent ?? color.ink, whiteSpace: "nowrap" }}>
-        {value}
-      </p>
-    </div>
-  );
-}
+const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
 export default function Mint() {
   const { address, isConnected } = useAccount();
 
-  const zero = "0x0000000000000000000000000000000000000000" as const;
   const read = (functionName: string, args?: readonly unknown[]) =>
-    ({ address: CROCSPAD_ADDRESS, abi: CROCSPAD_ABI, functionName, ...(args ? { args } : {}) } as const);
+    ({ address: CROCSPAD_ADDRESS, abi: CROCSPAD_ABI, functionName, ...(args ? { args } : {}) });
 
   const { data, refetch } = useReadContracts({
     contracts: [
+      read("owner"),
       read("phase"),
       read("paused"),
       read("allowlistPrice"),
@@ -43,19 +34,22 @@ export default function Mint() {
       read("maxPerWalletPublic"),
       read("totalAllowlistMinted"),
       read("totalPublicMinted"),
+      read("totalTeamMinted"),
       read("totalSupply"),
       read("MAX_SUPPLY"),
+      read("TEAM_ALLOCATION"),
+      read("ALLOWLIST_SUPPLY_CAP"),
       read("MINTABLE_SUPPLY"),
-      read("allowlistMinted", [address ?? zero]),
-      read("publicMinted", [address ?? zero]),
+      read("allowlistMinted", [address ?? ZERO]),
+      read("publicMinted", [address ?? ZERO]),
     ] as any,
     query: { refetchInterval: 12000 },
   });
 
   const [
-    phase, paused, allowlistPrice, publicPrice, launchpadFee,
-    maxAL, maxPub, totalAL, totalPub, totalSupply, maxSupply, mintableSupply,
-    myAL, myPub,
+    owner, phase, paused, allowlistPrice, publicPrice, launchpadFee,
+    maxAL, maxPub, totalAL, totalPub, totalTeam, totalSupply,
+    maxSupply, teamCap, alCap, mintableSupply, myAL, myPub,
   ] = data?.map((d) => d.result) ?? [];
 
   const phaseNum = phase !== undefined ? Number(phase) : PHASE.CLOSED;
@@ -97,11 +91,12 @@ export default function Mint() {
       ? Number(mintableSupply) - Number(totalAL) - Number(totalPub)
       : null;
 
-  const unitCost = price !== undefined && launchpadFee !== undefined ? BigInt(price) + BigInt(launchpadFee) : null;
+  const unitCost = price !== undefined && launchpadFee !== undefined ? BigInt(price as bigint) + BigInt(launchpadFee as bigint) : null;
   const totalCost = unitCost !== null ? formatEther(unitCost * BigInt(qty)) : null;
 
+  const saleOpen = phaseNum !== PHASE.CLOSED;
   const canMint =
-    isConnected && !paused && phaseNum !== PHASE.CLOSED &&
+    isConnected && !paused && saleOpen &&
     (phaseNum === PHASE.PUBLIC || (isAllowlist && elig === "yes" && !!proof)) &&
     qty > 0 && (myLeft === null || qty <= myLeft) && (poolLeft === null || qty <= poolLeft);
 
@@ -123,19 +118,18 @@ export default function Mint() {
   function buttonLabel() {
     if (!isConnected) return "Connect wallet";
     if (paused) return "Minting paused";
-    if (phaseNum === PHASE.CLOSED) return "Not open yet";
+    if (!saleOpen) return "Sale hasn't opened";
     if (isAllowlist && elig === "checking") return "Checking allowlist…";
     if (isAllowlist && elig === "no") return "Wallet not on allowlist";
-    if (isAllowlist && elig === "error") return "Retry eligibility check";
+    if (isAllowlist && elig === "error") return "Eligibility unavailable";
+    if (myLeft !== null && myLeft <= 0) return "Wallet limit reached";
     if (isPending) return "Confirm in wallet";
     if (confirming) return "Minting…";
-    if (myLeft !== null && myLeft <= 0) return "Wallet limit reached";
     return `Mint ${qty}`;
   }
 
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "44px 22px 20px" }}>
-      {/* header row */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "30px" }}>
         <div>
           <p style={{ fontFamily: font.mono, fontSize: "0.7rem", letterSpacing: "0.18em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 10px" }}>
@@ -149,8 +143,8 @@ export default function Mint() {
           style={{
             fontFamily: font.mono, fontSize: "0.72rem", letterSpacing: "0.1em", textTransform: "uppercase",
             padding: "9px 16px", border: RULE,
-            background: paused ? color.tongue : phaseNum === PHASE.CLOSED ? color.paper : color.croc,
-            color: phaseNum === PHASE.CLOSED && !paused ? color.ink : color.paper,
+            background: paused ? color.tongue : !saleOpen ? color.paper : color.croc,
+            color: !saleOpen && !paused ? color.ink : color.paper,
           }}
         >
           {paused ? "Paused" : PHASE_LABEL[phaseNum]}
@@ -158,24 +152,24 @@ export default function Mint() {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "26px", alignItems: "start" }}>
-        {/* left — art + feed */}
+        {/* left column */}
         <div style={{ display: "flex", flexDirection: "column", gap: "26px" }}>
           <CrocFrame size={380} />
           <MintFeed />
         </div>
 
-        {/* right — supply, eligibility, controls */}
+        {/* right column */}
         <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
-          {/* supply */}
+          {/* overall supply */}
           <section style={{ border: RULE, background: color.paper }}>
             <div style={{ padding: "20px 18px 18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "14px" }}>
                 <span style={{ fontFamily: font.mono, fontSize: "0.66rem", letterSpacing: "0.14em", textTransform: "uppercase", color: color.inkSoft }}>
-                  Minted
+                  Total minted
                 </span>
                 <span style={{ fontFamily: font.display, fontWeight: 800, fontSize: "1.9rem", letterSpacing: "-0.03em" }}>
-                  {minted ?? "—"}
-                  <span style={{ color: color.inkFaint, fontWeight: 600 }}> / {supply ?? "—"}</span>
+                  {minted !== null ? minted.toLocaleString() : "—"}
+                  <span style={{ color: color.inkFaint, fontWeight: 600 }}> / {supply !== null ? supply.toLocaleString() : "—"}</span>
                 </span>
               </div>
 
@@ -189,56 +183,23 @@ export default function Mint() {
                 <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
               </div>
             </div>
-
-            <div style={{ display: "flex", borderTop: RULE }}>
-              <Stat label="Price" value={price !== undefined ? (Number(price) === 0 ? "Free" : `${formatEther(BigInt(price))}`) : "—"} />
-              <Stat label="Per wallet" value={walletCap !== undefined ? (Number(walletCap) >= 1000 ? "No cap" : String(walletCap)) : "—"} />
-              <div style={{ padding: "16px 18px", flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: font.mono, fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 8px" }}>You own</p>
-                <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.3rem", margin: 0, letterSpacing: "-0.02em" }}>
-                  {mine !== undefined ? String(mine) : "—"}
-                </p>
-              </div>
-            </div>
           </section>
 
-          {/* eligibility — allowlist only */}
-          {isAllowlist && isConnected && (
-            <section
-              style={{
-                border: RULE, padding: "16px 18px",
-                display: "flex", alignItems: "center", gap: "12px",
-                background: elig === "yes" ? color.croc : elig === "no" ? color.tongue : color.paperDeep,
-                color: elig === "yes" || elig === "no" ? color.paper : color.ink,
-              }}
-            >
-              <span
-                style={{
-                  width: "10px", height: "10px", flexShrink: 0,
-                  background: elig === "checking" ? color.sun : elig === "yes" || elig === "no" ? color.paper : color.inkFaint,
-                  animation: elig === "checking" ? "blink 1s step-end infinite" : "none",
-                }}
-              />
-              <div>
-                <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "0.98rem", margin: 0, letterSpacing: "-0.01em" }}>
-                  {elig === "checking" && "Checking your wallet"}
-                  {elig === "yes" && "You're on the allowlist"}
-                  {elig === "no" && "Not on the allowlist"}
-                  {elig === "error" && "Couldn't reach the allowlist"}
-                </p>
-                <p style={{ fontFamily: font.mono, fontSize: "0.68rem", margin: "3px 0 0", opacity: 0.85 }}>
-                  {elig === "checking" && "One moment."}
-                  {elig === "yes" && `Up to ${walletCap !== undefined ? String(walletCap) : "—"} this phase.`}
-                  {elig === "no" && "Public mint opens after this phase."}
-                  {elig === "error" && "Reconnect your wallet to try again."}
-                </p>
-              </div>
-            </section>
-          )}
+          <PhaseTracks
+            phase={phaseNum}
+            teamMinted={totalTeam}
+            teamCap={teamCap}
+            allowlistMinted={totalAL}
+            allowlistCap={alCap}
+            publicMinted={totalPub}
+            mintableSupply={mintableSupply}
+            elig={elig}
+            isConnected={isConnected}
+          />
 
           {/* controls */}
           <section style={{ border: RULE, background: color.paper, boxShadow: offset(color.ink) }}>
-            <div style={{ display: "flex", alignItems: "stretch", borderBottom: RULE }}>
+            <div style={{ display: "flex", borderBottom: RULE }}>
               <div style={{ padding: "16px 18px", flex: 1 }}>
                 <p style={{ fontFamily: font.mono, fontSize: "0.62rem", letterSpacing: "0.14em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 4px" }}>
                   Amount
@@ -248,12 +209,12 @@ export default function Mint() {
               <button
                 onClick={() => setQty((q) => Math.max(1, q - 1))}
                 aria-label="Decrease amount"
-                style={{ width: "64px", borderLeft: RULE, background: color.paper, cursor: "pointer", fontSize: "1.5rem", border: "none", borderLeftWidth: "2px", borderLeftStyle: "solid", borderLeftColor: color.ink }}
+                style={{ width: "64px", borderLeft: RULE, background: color.paper, cursor: "pointer", fontSize: "1.5rem", borderTop: "none", borderRight: "none", borderBottom: "none" }}
               >−</button>
               <button
-                onClick={() => setQty((q) => (myLeft !== null ? Math.min(myLeft, q + 1) : q + 1))}
+                onClick={() => setQty((q) => (myLeft !== null ? Math.min(Math.max(1, myLeft), q + 1) : q + 1))}
                 aria-label="Increase amount"
-                style={{ width: "64px", borderLeft: RULE, background: color.sun, cursor: "pointer", fontSize: "1.5rem", border: "none", borderLeftWidth: "2px", borderLeftStyle: "solid", borderLeftColor: color.ink }}
+                style={{ width: "64px", borderLeft: RULE, background: color.sun, cursor: "pointer", fontSize: "1.5rem", borderTop: "none", borderRight: "none", borderBottom: "none" }}
               >+</button>
             </div>
 
@@ -268,7 +229,8 @@ export default function Mint() {
                 disabled={!canMint || isPending || confirming}
                 className={canMint ? "press" : undefined}
                 style={{
-                  width: "100%", padding: "18px", border: RULE, cursor: canMint && !isPending && !confirming ? "pointer" : "not-allowed",
+                  width: "100%", padding: "18px", border: RULE,
+                  cursor: canMint && !isPending && !confirming ? "pointer" : "not-allowed",
                   fontFamily: font.display, fontWeight: 800, fontSize: "1.05rem", letterSpacing: "-0.01em",
                   background: canMint ? color.ink : color.paperDeep,
                   color: canMint ? color.paper : color.inkFaint,
@@ -288,13 +250,10 @@ export default function Mint() {
                   Minted. Welcome to the swamp.
                 </p>
               )}
-              {poolLeft !== null && poolLeft <= 0 && (
-                <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.inkSoft, margin: "12px 0 0" }}>
-                  Public supply is fully minted.
-                </p>
-              )}
             </div>
           </section>
+
+          <TeamMint owner={owner} teamMinted={totalTeam} teamCap={teamCap} onMinted={refetch} />
         </div>
       </div>
     </div>
