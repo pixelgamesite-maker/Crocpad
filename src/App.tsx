@@ -17,6 +17,7 @@ import Traits from "@/pages/traits";
 import Token from "@/pages/token";
 import Economy from "@/pages/economy";
 import Docs from "@/pages/docs";
+import Admin from "@/pages/admin";
 import NavLink from "@/components/nav-link";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ export default function App() {
                   <Route path="/token" component={Token} />
                   <Route path="/economy" component={Economy} />
                   <Route path="/docs" component={Docs} />
+                  <Route path="/admin" component={Admin} />
                   <Route component={NotFound} />
                 </Switch>
               </Layout>
