@@ -1,5 +1,5 @@
 import "@rainbow-me/rainbowkit/styles.css";
-import { Router as WouterRouter, Route, Switch, Link } from "wouter";
+import { Router as WouterRouter, Route, Switch } from "wouter";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RainbowKitProvider, lightTheme } from "@rainbow-me/rainbowkit";
@@ -17,6 +17,7 @@ import Traits from "@/pages/traits";
 import Token from "@/pages/token";
 import Economy from "@/pages/economy";
 import Docs from "@/pages/docs";
+import NavLink from "@/components/nav-link";
 
 const queryClient = new QueryClient();
 
@@ -39,18 +40,14 @@ function NotFound() {
       <p style={{ color: color.inkSoft, fontSize: "1.02rem", margin: "0 0 32px" }}>
         That page doesn't exist. Check the menu for everything on the pad.
       </p>
-      <Link href="/">
-        <a
-          className="press"
+      <NavLink href="/" className="press"
           style={{
             display: "inline-block", fontFamily: font.display, fontWeight: 800, fontSize: "1rem",
             padding: "16px 30px", border: RULE, background: color.ink, color: color.paper,
             boxShadow: offset(color.croc, 6, 6),
-          }}
-        >
+          }}>
           Back home
-        </a>
-      </Link>
+        </NavLink>
     </div>
   );
 }
