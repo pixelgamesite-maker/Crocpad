@@ -54,4 +54,9 @@ export const CROCSPAD_ABI = [
     inputs: [{ type: "address", name: "to" }, { type: "uint256", name: "quantity" }],
     outputs: [],
   },
+  {
+    type: "function", name: "setMerkleRoot", stateMutability: "nonpayable",
+    inputs: [{ type: "bytes32", name: "root" }],
+    outputs: [],
+  },
 ] as const;
