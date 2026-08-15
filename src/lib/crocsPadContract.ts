@@ -59,4 +59,9 @@ export const CROCSPAD_ABI = [
     inputs: [{ type: "bytes32", name: "root" }],
     outputs: [],
   },
+  {
+    type: "function", name: "setPhase", stateMutability: "nonpayable",
+    inputs: [{ type: "uint8", name: "newPhase" }],
+    outputs: [],
+  },
 ] as const;
