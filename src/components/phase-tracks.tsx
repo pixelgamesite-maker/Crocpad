@@ -87,15 +87,28 @@ export default function PhaseTracks({
   const publicCeiling = mintable !== null && alMinted !== null ? mintable - alMinted : null;
 
   function allowlistStatus(): [string, "good" | "bad" | "muted"] {
-    // Before the whitelist phase opens, lead with when it opens rather
-    // than eligibility — there's nothing to check yet.
-    if (phase === PHASE.CLOSED) return ["Opens 4:10pm UTC", "muted"];
-    if (phase !== PHASE.ALLOWLIST) return ["", "muted"];
-    if (!isConnected) return ["Connect to check eligibility", "muted"];
-    if (elig === "checking") return ["Checking your wallet…", "muted"];
-    if (elig === "yes") return ["Eligible — you can mint", "good"];
-    if (elig === "no") return ["This wallet isn't on the list", "bad"];
-    if (elig === "error") return ["Eligibility check unavailable", "bad"];
+    const timeNote = phase === PHASE.CLOSED ? "Opens 4:10pm UTC" : "";
+
+    if (isConnected) {
+      if (elig === "checking") {
+        return [[timeNote, "Checking your wallet…"].filter(Boolean).join(" · "), "muted"];
+      }
+      if (elig === "yes") {
+        return [[timeNote, "Eligible"].filter(Boolean).join(" · "), "good"];
+      }
+      if (elig === "no") {
+        return [[timeNote, "This wallet isn't on the list"].filter(Boolean).join(" · "), "bad"];
+      }
+      if (elig === "error") {
+        return [[timeNote, "Eligibility check unavailable"].filter(Boolean).join(" · "), "bad"];
+      }
+      // elig === "idle" — connected but the check hasn't kicked off yet.
+      return [timeNote, "muted"];
+    }
+
+    // Not connected: time note plus a nudge to connect, when relevant.
+    if (phase === PHASE.CLOSED) return [[timeNote, "Connect to check eligibility"].join(" · "), "muted"];
+    if (phase === PHASE.ALLOWLIST) return ["Connect to check eligibility", "muted"];
     return ["", "muted"];
   }
 
