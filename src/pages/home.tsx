@@ -42,8 +42,8 @@ const SPECS: [string, string][] = [
 
 const SUPPLY_ROWS = [
   { label: "Team", count: "150", accent: color.inkSoft, note: "Reserved. Minted by the team, never sold." },
-  { label: "Whitelist", count: "4,000", accent: color.croc, note: "Free to mint, 2 per wallet. Ceiling, not a guarantee." },
-  { label: "Public", count: "1,850+", accent: color.sun, note: "0.0005 ETH. Grows by whatever the whitelist leaves behind." },
+  { label: "Whitelist", count: "4,000", accent: color.croc, note: "Free to mint, 2 per wallet." },
+  { label: "Public", count: "1,850+", accent: color.sun, note: "0.0005 ETH." },
 ];
 
 export default function Home() {
