@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { Link } from "wouter";
+
 import { color, font, loadFonts, RULE, X_URL } from "@/lib/theme";
 import GlobalStyle from "@/components/global-style";
 import Nav from "@/components/nav";
+import NavLink from "@/components/nav-link";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => { loadFonts(); }, []);
@@ -25,8 +26,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </p>
             </div>
             <div style={{ display: "flex", gap: "26px", fontFamily: font.mono, fontSize: "0.74rem" }}>
-              <Link href="/mint"><a>Mint</a></Link>
-              <Link href="/docs"><a>Docs</a></Link>
+              <NavLink href="/mint">Mint</NavLink>
+              <NavLink href="/docs">Docs</NavLink>
               <a href={X_URL} target="_blank" rel="noopener noreferrer">X</a>
             </div>
           </div>
