@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link } from "wouter";
+
 import { color, font, RULE, offset } from "@/lib/theme";
+import NavLink from "@/components/nav-link";
 
 /**
  * Shared shell for sections that aren't built yet. The status line
@@ -89,30 +90,22 @@ export default function WorkInProgress({
       </div>
 
       <div style={{ display: "flex", gap: "12px", marginTop: "34px", flexWrap: "wrap" }}>
-        <Link href="/mint">
-          <a
-            className="press"
+        <NavLink href="/mint" className="press"
             style={{
               fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem",
               padding: "14px 24px", border: RULE, background: color.ink, color: color.paper,
               boxShadow: offset(color.croc, 5, 5),
-            }}
-          >
+            }}>
             Go to mint
-          </a>
-        </Link>
-        <Link href="/">
-          <a
-            className="press"
+          </NavLink>
+        <NavLink href="/" className="press"
             style={{
               fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem",
               padding: "14px 24px", border: RULE, background: color.paper,
               boxShadow: offset(color.ink, 5, 5),
-            }}
-          >
+            }}>
             Back home
-          </a>
-        </Link>
+          </NavLink>
       </div>
     </div>
   );
