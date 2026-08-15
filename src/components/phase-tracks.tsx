@@ -86,14 +86,17 @@ export default function PhaseTracks({
   // shares one pool between them, so the public ceiling isn't fixed.
   const publicCeiling = mintable !== null && alMinted !== null ? mintable - alMinted : null;
 
-  function allowlistStatus(): [string, "good" | "bad" | "muted"] | [] {
-    if (phase !== PHASE.ALLOWLIST) return [];
+  function allowlistStatus(): [string, "good" | "bad" | "muted"] {
+    // Before the whitelist phase opens, lead with when it opens rather
+    // than eligibility — there's nothing to check yet.
+    if (phase === PHASE.CLOSED) return ["Opens 4:10pm UTC", "muted"];
+    if (phase !== PHASE.ALLOWLIST) return ["", "muted"];
     if (!isConnected) return ["Connect to check eligibility", "muted"];
     if (elig === "checking") return ["Checking your wallet…", "muted"];
     if (elig === "yes") return ["Eligible — you can mint", "good"];
     if (elig === "no") return ["This wallet isn't on the list", "bad"];
     if (elig === "error") return ["Eligibility check unavailable", "bad"];
-    return [];
+    return ["", "muted"];
   }
 
   const [alStatus, alTone] = allowlistStatus();
@@ -122,7 +125,7 @@ export default function PhaseTracks({
         cap={alCap}
         active={phase === PHASE.ALLOWLIST}
         accent={color.croc}
-        status={alStatus}
+        status={alStatus || undefined}
         statusTone={alTone}
       />
 
