@@ -56,31 +56,12 @@ export default function Mint() {
   const phaseNum = phase !== undefined ? Number(phase) : PHASE.CLOSED;
   const isAllowlist = phaseNum === PHASE.ALLOWLIST;
 
-  /* ---- countdown — resyncs from chain every refetch, ticks locally between ---- */
-  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  useEffect(() => {
-    if (allowlistTimeRemaining === undefined) return;
-    setSecondsLeft(Number(allowlistTimeRemaining));
-  }, [allowlistTimeRemaining]);
-  useEffect(() => {
-    if (secondsLeft === null || secondsLeft <= 0) return;
-    const id = setInterval(() => setSecondsLeft((s) => (s !== null ? Math.max(0, s - 1) : s)), 1000);
-    return () => clearInterval(id);
-  }, [secondsLeft !== null && secondsLeft > 0]);
-
-  function formatDuration(total: number) {
-    const h = Math.floor(total / 3600);
-    const m = Math.floor((total % 3600) / 60);
-    const s = Math.floor(total % 60);
-    return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
-  }
-
-  /* ---- eligibility ---- */
+  /* ---- eligibility — checks as soon as wallet connects, any phase ---- */
   const [elig, setElig] = useState<"idle" | "checking" | "yes" | "no" | "error">("idle");
   const [proof, setProof] = useState<string[] | null>(null);
 
   useEffect(() => {
-    if (!isConnected || !address || !isAllowlist) { setElig("idle"); setProof(null); return; }
+    if (!isConnected || !address) { setElig("idle"); setProof(null); return; }
     let cancelled = false;
     setElig("checking");
     fetch(`${ALLOWLIST_API_URL}/api/allowlist-proof?address=${address}`)
@@ -92,7 +73,7 @@ export default function Mint() {
       })
       .catch(() => { if (!cancelled) setElig("error"); });
     return () => { cancelled = true; };
-  }, [isConnected, address, isAllowlist]);
+  }, [isConnected, address]);
 
   /* ---- mint ---- */
   const [qty, setQty] = useState(1);
@@ -171,27 +152,24 @@ export default function Mint() {
         </span>
       </div>
 
-      {isAllowlist && secondsLeft !== null && (
+      {phaseNum !== PHASE.PUBLIC && (
         <div
           style={{
-            border: RULE, background: secondsLeft > 0 ? color.ink : color.paperDeep,
+            border: RULE, background: color.ink,
             padding: "16px 20px", marginBottom: "26px",
             display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px",
           }}
         >
-          <span style={{ fontFamily: font.mono, fontSize: "0.68rem", letterSpacing: "0.12em", textTransform: "uppercase", color: secondsLeft > 0 ? color.paper : color.inkSoft }}>
-            {secondsLeft > 0 ? "Whitelist window" : "Suggested window elapsed"}
+          <span style={{ fontFamily: font.mono, fontSize: "0.68rem", letterSpacing: "0.12em", textTransform: "uppercase", color: color.paper }}>
+            Whitelist window
           </span>
           <span
             style={{
-              fontFamily: font.mono, fontSize: "1.5rem", fontWeight: 500,
-              color: secondsLeft > 0 ? color.sun : color.inkFaint, letterSpacing: "0.02em",
+              fontFamily: font.mono, fontSize: "1.3rem", fontWeight: 500,
+              color: color.sun, letterSpacing: "0.02em",
             }}
           >
-            {formatDuration(secondsLeft)}
-          </span>
-          <span style={{ fontFamily: font.mono, fontSize: "0.66rem", color: secondsLeft > 0 ? color.paper : color.inkFaint, opacity: 0.75 }}>
-            Minting stays open until the team starts the next phase.
+            Whitelist starts 4:10pm UTC
           </span>
         </div>
       )}
