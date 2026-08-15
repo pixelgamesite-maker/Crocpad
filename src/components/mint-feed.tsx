@@ -1,51 +1,90 @@
-import { useEffect, useState } from "react";
-import { useWatchContractEvent } from "wagmi";
+import { useEffect, useRef, useState } from "react";
+import { useReadContract, usePublicClient } from "wagmi";
 import { color, font, RULE } from "@/lib/theme";
-import { CROCSPAD_ADDRESS } from "@/lib/crocsPadContract";
+import { CROCSPAD_ADDRESS, CROCSPAD_ABI } from "@/lib/crocsPadContract";
 
 type FeedRow = { tokenId: string; to: string; key: string };
 
-const TRANSFER_EVENT = [
+// Not in the shared ABI — only needed here, so kept local.
+const OWNER_OF_ABI = [
   {
-    type: "event",
-    name: "Transfer",
-    inputs: [
-      { indexed: true, name: "from", type: "address" },
-      { indexed: true, name: "to", type: "address" },
-      { indexed: true, name: "tokenId", type: "uint256" },
-    ],
+    type: "function",
+    name: "ownerOf",
+    stateMutability: "view",
+    inputs: [{ type: "uint256", name: "tokenId" }],
+    outputs: [{ type: "address" }],
   },
 ] as const;
-
-const ZERO = "0x0000000000000000000000000000000000000000";
 
 function short(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
 export default function MintFeed() {
+  const publicClient = usePublicClient();
   const [rows, setRows] = useState<FeedRow[]>([]);
+  const lastSupply = useRef<number | null>(null);
 
-  useWatchContractEvent({
+  // Pure eth_call, polled — same proven-working path as the mint page's numbers.
+  const { data: totalSupply } = useReadContract({
     address: CROCSPAD_ADDRESS,
-    abi: TRANSFER_EVENT,
-    eventName: "Transfer",
-    onLogs(logs) {
-      const mints = logs
-        .filter((l: any) => l.args?.from?.toLowerCase() === ZERO)
-        .map((l: any) => ({
-          tokenId: String(l.args.tokenId),
-          to: l.args.to as string,
-          key: `${l.transactionHash}-${l.args.tokenId}`,
-        }));
-      if (mints.length === 0) return;
+    abi: CROCSPAD_ABI,
+    functionName: "totalSupply",
+    query: { refetchInterval: 8000 },
+  });
+
+  useEffect(() => {
+    if (totalSupply === undefined || !publicClient) return;
+    const supply = Number(totalSupply);
+
+    // First read just sets the baseline — nothing to diff against yet.
+    if (lastSupply.current === null) {
+      lastSupply.current = supply;
+      return;
+    }
+
+    const prevSupply = lastSupply.current;
+    if (supply <= prevSupply) {
+      lastSupply.current = supply;
+      return;
+    }
+
+    lastSupply.current = supply;
+
+    // ERC721A mints sequentially, so [prevSupply, supply) are the new token IDs.
+    // Token IDs may start at 0 or 1 depending on the contract — this assumes 0-indexed;
+    // flip to prevSupply + 1 .. supply if yours starts at 1.
+    const newIds = Array.from({ length: supply - prevSupply }, (_, i) => prevSupply + i);
+
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        newIds.map(async (id) => {
+          try {
+            const owner = await publicClient.readContract({
+              address: CROCSPAD_ADDRESS,
+              abi: OWNER_OF_ABI,
+              functionName: "ownerOf",
+              args: [BigInt(id)],
+            });
+            return { tokenId: String(id), to: owner as string, key: `${id}-${owner}` };
+          } catch {
+            return null;
+          }
+        })
+      );
+      if (cancelled) return;
+      const fresh = results.filter((r): r is FeedRow => r !== null);
+      if (fresh.length === 0) return;
       setRows((prev) => {
         const seen = new Set(prev.map((r) => r.key));
-        const fresh = mints.filter((m) => !seen.has(m.key));
-        return [...fresh.reverse(), ...prev].slice(0, 12);
+        const dedup = fresh.filter((f) => !seen.has(f.key));
+        return [...dedup.reverse(), ...prev].slice(0, 12);
       });
-    },
-  });
+    })();
+
+    return () => { cancelled = true; };
+  }, [totalSupply, publicClient]);
 
   return (
     <section style={{ border: RULE, background: color.paper }}>
