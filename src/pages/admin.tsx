@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { color, font, RULE, offset } from "@/lib/theme";
-import { CROCSPAD_ADDRESS, CROCSPAD_ABI, ALLOWLIST_API_URL } from "@/lib/crocsPadContract";
+import { CROCSPAD_ADDRESS, CROCSPAD_ABI, ALLOWLIST_API_URL, PHASE } from "@/lib/crocsPadContract";
 
 type GenResult = { root: string; count: number; skippedCount: number; skipped: string[] };
 
@@ -15,6 +15,12 @@ export default function Admin() {
     address: CROCSPAD_ADDRESS,
     abi: CROCSPAD_ABI,
     functionName: "owner",
+  });
+
+  const { data: currentPhase, refetch: refetchPhase } = useReadContract({
+    address: CROCSPAD_ADDRESS,
+    abi: CROCSPAD_ABI,
+    functionName: "phase",
   });
 
   const isOwner =
@@ -68,6 +74,23 @@ export default function Admin() {
   const { writeContract, data: hash, isPending, error: writeError, reset } = useWriteContract();
   const { isLoading: confirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
+  const { writeContract: writePhase, data: phaseHash, isPending: phasePending, error: phaseError, reset: resetPhase } = useWriteContract();
+  const { isLoading: phaseConfirming, isSuccess: phaseSuccess } = useWaitForTransactionReceipt({ hash: phaseHash });
+
+  useEffect(() => {
+    if (phaseSuccess) refetchPhase();
+  }, [phaseSuccess]);
+
+  function goToPhase(p: number) {
+    resetPhase();
+    writePhase({
+      address: CROCSPAD_ADDRESS,
+      abi: CROCSPAD_ABI,
+      functionName: "setPhase",
+      args: [p],
+    });
+  }
+
   function setRootOnChain() {
     if (!result) return;
     reset();
@@ -106,8 +129,63 @@ export default function Admin() {
         Owner only
       </p>
       <h1 style={{ fontFamily: font.display, fontWeight: 800, fontSize: "2.6rem", letterSpacing: "-0.03em", margin: "0 0 30px" }}>
-        Allowlist
+        Admin
       </h1>
+
+      {/* phase control */}
+      <section style={{ border: RULE, background: color.paper, boxShadow: offset(color.tongue), marginBottom: "30px" }}>
+        <div style={{ padding: "13px 18px", borderBottom: RULE }}>
+          <span style={{ fontFamily: font.mono, fontSize: "0.64rem", letterSpacing: "0.14em", textTransform: "uppercase", color: color.inkSoft }}>
+            Sale phase
+          </span>
+        </div>
+        <div style={{ padding: "18px" }}>
+          <p style={{ fontFamily: font.mono, fontSize: "0.74rem", color: color.inkSoft, margin: "0 0 14px" }}>
+            Currently: <span style={{ color: color.ink, fontWeight: 600 }}>
+              {currentPhase === undefined ? "—" : ["Closed", "Whitelist", "Public"][Number(currentPhase)]}
+            </span>
+          </p>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {[
+              { label: "Closed", value: PHASE.CLOSED },
+              { label: "Start whitelist", value: PHASE.ALLOWLIST },
+              { label: "Start public", value: PHASE.PUBLIC },
+            ].map((p) => {
+              const isCurrent = currentPhase !== undefined && Number(currentPhase) === p.value;
+              return (
+                <button
+                  key={p.value}
+                  onClick={() => goToPhase(p.value)}
+                  disabled={isCurrent || phasePending || phaseConfirming}
+                  className={!isCurrent ? "press" : undefined}
+                  style={{
+                    flex: "1 1 140px", padding: "13px 14px", border: RULE,
+                    fontFamily: font.display, fontWeight: 700, fontSize: "0.88rem",
+                    cursor: isCurrent ? "default" : "pointer",
+                    background: isCurrent ? color.croc : color.paper,
+                    color: isCurrent ? color.paper : color.ink,
+                  }}
+                >
+                  {isCurrent ? "Active" : p.label}
+                </button>
+              );
+            })}
+          </div>
+          {phaseError && (
+            <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.tongue, marginTop: "12px" }}>
+              {(phaseError as any).shortMessage ?? "Transaction failed."}
+            </p>
+          )}
+          {(phasePending || phaseConfirming) && (
+            <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.inkSoft, marginTop: "12px" }}>
+              {phasePending ? "Confirm in wallet…" : "Setting phase…"}
+            </p>
+          )}
+          <p style={{ fontFamily: font.mono, fontSize: "0.64rem", color: color.inkFaint, margin: "14px 0 0", lineHeight: 1.5 }}>
+            Starting whitelist requires a merkle root already set below, or every wallet will show as ineligible.
+          </p>
+        </div>
+      </section>
 
       {/* step 1: admin key */}
       <section style={{ border: RULE, background: color.paper, marginBottom: "20px" }}>
