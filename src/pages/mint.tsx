@@ -40,6 +40,7 @@ export default function Mint() {
       read("TEAM_ALLOCATION"),
       read("ALLOWLIST_SUPPLY_CAP"),
       read("MINTABLE_SUPPLY"),
+      read("allowlistTimeRemaining"),
       read("allowlistMinted", [address ?? ZERO]),
       read("publicMinted", [address ?? ZERO]),
     ] as any,
@@ -49,11 +50,30 @@ export default function Mint() {
   const [
     owner, phase, paused, allowlistPrice, publicPrice, launchpadFee,
     maxAL, maxPub, totalAL, totalPub, totalTeam, totalSupply,
-    maxSupply, teamCap, alCap, mintableSupply, myAL, myPub,
+    maxSupply, teamCap, alCap, mintableSupply, allowlistTimeRemaining, myAL, myPub,
   ] = data?.map((d) => d.result) ?? [];
 
   const phaseNum = phase !== undefined ? Number(phase) : PHASE.CLOSED;
   const isAllowlist = phaseNum === PHASE.ALLOWLIST;
+
+  /* ---- countdown — resyncs from chain every refetch, ticks locally between ---- */
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (allowlistTimeRemaining === undefined) return;
+    setSecondsLeft(Number(allowlistTimeRemaining));
+  }, [allowlistTimeRemaining]);
+  useEffect(() => {
+    if (secondsLeft === null || secondsLeft <= 0) return;
+    const id = setInterval(() => setSecondsLeft((s) => (s !== null ? Math.max(0, s - 1) : s)), 1000);
+    return () => clearInterval(id);
+  }, [secondsLeft !== null && secondsLeft > 0]);
+
+  function formatDuration(total: number) {
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = Math.floor(total % 60);
+    return [h, m, s].map((n) => String(n).padStart(2, "0")).join(":");
+  }
 
   /* ---- eligibility ---- */
   const [elig, setElig] = useState<"idle" | "checking" | "yes" | "no" | "error">("idle");
@@ -150,6 +170,31 @@ export default function Mint() {
           {paused ? "Paused" : PHASE_LABEL[phaseNum]}
         </span>
       </div>
+
+      {isAllowlist && secondsLeft !== null && (
+        <div
+          style={{
+            border: RULE, background: secondsLeft > 0 ? color.ink : color.paperDeep,
+            padding: "16px 20px", marginBottom: "26px",
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px",
+          }}
+        >
+          <span style={{ fontFamily: font.mono, fontSize: "0.68rem", letterSpacing: "0.12em", textTransform: "uppercase", color: secondsLeft > 0 ? color.paper : color.inkSoft }}>
+            {secondsLeft > 0 ? "Whitelist window" : "Suggested window elapsed"}
+          </span>
+          <span
+            style={{
+              fontFamily: font.mono, fontSize: "1.5rem", fontWeight: 500,
+              color: secondsLeft > 0 ? color.sun : color.inkFaint, letterSpacing: "0.02em",
+            }}
+          >
+            {formatDuration(secondsLeft)}
+          </span>
+          <span style={{ fontFamily: font.mono, fontSize: "0.66rem", color: secondsLeft > 0 ? color.paper : color.inkFaint, opacity: 0.75 }}>
+            Minting stays open until the team starts the next phase.
+          </span>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "26px", alignItems: "start" }}>
         {/* left column */}
