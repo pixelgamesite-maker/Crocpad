@@ -13,6 +13,7 @@ export const NAV: NavItem[] = [
   { label: "Vault", href: "/vault", live: false },
   { label: "Staking", href: "/staking", live: false },
   { label: "Traits", href: "/traits", live: false },
+  { label: "Shuffler", href: "/shuffler", live: false },
   { label: "Token", href: "/token", live: false },
   { label: "Economy", href: "/economy", live: false },
   { label: "Docs", href: "/docs", live: true },
