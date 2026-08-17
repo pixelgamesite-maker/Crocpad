@@ -18,6 +18,11 @@ import Token from "@/pages/token";
 import Economy from "@/pages/economy";
 import Docs from "@/pages/docs";
 import Admin from "@/pages/admin";
+import Shuffler from "@/pages/shuffler";
+import ShufflerRaffles from "@/pages/shuffler-raffles";
+import ShufflerAuctions from "@/pages/shuffler-auctions";
+import ShufflerTickets from "@/pages/shuffler-tickets";
+import ShufflerWhitelist from "@/pages/shuffler-whitelist";
 import NavLink from "@/components/nav-link";
 
 const queryClient = new QueryClient();
@@ -71,6 +76,11 @@ export default function App() {
                   <Route path="/economy" component={Economy} />
                   <Route path="/docs" component={Docs} />
                   <Route path="/admin" component={Admin} />
+                  <Route path="/shuffler" component={Shuffler} />
+                  <Route path="/shuffler/raffles" component={ShufflerRaffles} />
+                  <Route path="/shuffler/auctions" component={ShufflerAuctions} />
+                  <Route path="/shuffler/tickets" component={ShufflerTickets} />
+                  <Route path="/shuffler/whitelist" component={ShufflerWhitelist} />
                   <Route component={NotFound} />
                 </Switch>
               </Layout>
