@@ -53,9 +53,12 @@ export const SHUFFLER_RAFFLE_ABI = [
 ] as const;
 
 // Minimal ERC721 surface needed for the approve-then-deposit flow —
-// works against any collection, not just CrocsPad.
+// works against any collection, not just CrocsPad. Uses the
+// approve-for-all pattern rather than per-token approve, so raffling
+// several tokens from the same collection needs one approval, not one
+// per token.
 export const ERC721_MIN_ABI = [
-  { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "uint256" }], outputs: [] },
-  { type: "function", name: "getApproved", stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "address" }] },
+  { type: "function", name: "setApprovalForAll", stateMutability: "nonpayable", inputs: [{ type: "address" }, { type: "bool" }], outputs: [] },
+  { type: "function", name: "isApprovedForAll", stateMutability: "view", inputs: [{ type: "address" }, { type: "address" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "ownerOf", stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "address" }] },
 ] as const;
