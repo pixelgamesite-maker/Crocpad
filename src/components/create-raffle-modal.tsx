@@ -1,53 +1,87 @@
 import { useState } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { formatEther, parseEther, isAddress } from "viem";
+import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { formatEther, isAddress } from "viem";
 import { color, font, RULE, offset } from "@/lib/theme";
 import { SHUFFLER_RAFFLE_ADDRESS, SHUFFLER_RAFFLE_ABI, ERC721_MIN_ABI, ELIGIBILITY } from "@/lib/shufflerRaffleContract";
+
+const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
 const inputStyle: React.CSSProperties = {
   width: "100%", padding: "11px 12px", border: RULE, background: color.paper,
   fontFamily: font.mono, fontSize: "0.82rem", color: color.ink, outline: "none",
 };
 
+type PrizeRow = { nftContract: string; tokenId: string };
+
 export default function CreateRaffleForm({ onCreated }: { onCreated: () => void }) {
   const { address, isConnected } = useAccount();
 
-  const [nftContract, setNftContract] = useState("");
-  const [tokenId, setTokenId] = useState("");
+  const [prizes, setPrizes] = useState<PrizeRow[]>([{ nftContract: "", tokenId: "" }]);
   const [days, setDays] = useState("1");
   const [gated, setGated] = useState(false);
   const [gatingCollection, setGatingCollection] = useState("");
 
-  const { data: creationFee } = useReadContract({
-    address: SHUFFLER_RAFFLE_ADDRESS, abi: SHUFFLER_RAFFLE_ABI, functionName: "creationFee",
-  });
+  function updatePrize(i: number, field: keyof PrizeRow, value: string) {
+    setPrizes((rows) => rows.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
+  }
+  function addPrize() {
+    setPrizes((rows) => [...rows, { nftContract: "", tokenId: "" }]);
+  }
+  function removePrize(i: number) {
+    setPrizes((rows) => (rows.length > 1 ? rows.filter((_, idx) => idx !== i) : rows));
+  }
 
-  const validNft = isAddress(nftContract);
-  const validTokenId = tokenId.trim() !== "" && !isNaN(Number(tokenId));
+  const validPrizeRows = prizes.filter((p) => isAddress(p.nftContract) && p.tokenId.trim() !== "" && !isNaN(Number(p.tokenId)));
+  const allRowsValid = validPrizeRows.length === prizes.length && prizes.length > 0;
   const validGating = !gated || isAddress(gatingCollection);
   const validDuration = Number(days) > 0;
 
-  const { data: approvedAddress, refetch: refetchApproval } = useReadContract({
-    address: validNft ? (nftContract as `0x${string}`) : undefined,
-    abi: ERC721_MIN_ABI,
-    functionName: "getApproved",
-    args: validTokenId ? [BigInt(tokenId)] : undefined,
-    query: { enabled: validNft && validTokenId },
-  });
-  const isApproved = approvedAddress?.toLowerCase() === SHUFFLER_RAFFLE_ADDRESS.toLowerCase();
+  // One approval needed per unique NFT contract across all prize rows —
+  // setApprovalForAll covers every token from that contract in one shot.
+  const uniqueContracts = Array.from(new Set(validPrizeRows.map((p) => p.nftContract.toLowerCase())));
 
+  const { data: creationFeeData } = useReadContracts({
+    contracts: [{ address: SHUFFLER_RAFFLE_ADDRESS, abi: SHUFFLER_RAFFLE_ABI, functionName: "creationFee" }],
+  });
+  const creationFee = creationFeeData?.[0]?.result as bigint | undefined;
+
+  const { data: approvalData, refetch: refetchApprovals } = useReadContracts({
+    contracts: uniqueContracts.map((contract) => ({
+      address: contract as `0x${string}`,
+      abi: ERC721_MIN_ABI,
+      functionName: "isApprovedForAll",
+      args: [address ?? ZERO, SHUFFLER_RAFFLE_ADDRESS],
+    })),
+    query: { enabled: isConnected && uniqueContracts.length > 0 },
+  });
+
+  const approvalStatus = uniqueContracts.map((contract, i) => ({
+    contract,
+    approved: approvalData?.[i]?.result === true,
+  }));
+  const unapproved = approvalStatus.filter((a) => !a.approved);
+  const allApproved = uniqueContracts.length > 0 && unapproved.length === 0;
+
+  const [approvingContract, setApprovingContract] = useState<string | null>(null);
   const approveWrite = useWriteContract();
   const approveReceipt = useWaitForTransactionReceipt({ hash: approveWrite.data });
 
   const createWrite = useWriteContract();
   const createReceipt = useWaitForTransactionReceipt({ hash: createWrite.data });
 
-  function approve() {
+  function approveContract(contract: string) {
     approveWrite.reset();
+    setApprovingContract(contract);
     approveWrite.writeContract({
-      address: nftContract as `0x${string}`, abi: ERC721_MIN_ABI, functionName: "approve",
-      args: [SHUFFLER_RAFFLE_ADDRESS, BigInt(tokenId)],
+      address: contract as `0x${string}`, abi: ERC721_MIN_ABI, functionName: "setApprovalForAll",
+      args: [SHUFFLER_RAFFLE_ADDRESS, true],
     });
+  }
+
+  if (approveReceipt.isSuccess && approvingContract) {
+    refetchApprovals();
+    setApprovingContract(null);
+    approveWrite.reset();
   }
 
   function create() {
@@ -57,23 +91,25 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
     createWrite.writeContract({
       address: SHUFFLER_RAFFLE_ADDRESS, abi: SHUFFLER_RAFFLE_ABI, functionName: "createRaffle",
       args: [
-        [nftContract as `0x${string}`],
-        [BigInt(tokenId)],
+        validPrizeRows.map((p) => p.nftContract as `0x${string}`),
+        validPrizeRows.map((p) => BigInt(p.tokenId)),
         durationSeconds,
         gated ? ELIGIBILITY.HOLDER_GATED : ELIGIBILITY.PUBLIC,
-        gated ? (gatingCollection as `0x${string}`) : "0x0000000000000000000000000000000000000000",
+        gated ? (gatingCollection as `0x${string}`) : ZERO,
       ],
       value: creationFee,
     });
   }
 
-  const canApprove = isConnected && validNft && validTokenId && !isApproved;
-  const canCreate = isConnected && validNft && validTokenId && validGating && validDuration && isApproved;
+  const canCreate = isConnected && allRowsValid && validGating && validDuration && allApproved;
+  const approvalInFlight = approveWrite.isPending || approveReceipt.isLoading;
 
   if (createReceipt.isSuccess) {
     return (
       <div style={{ border: RULE, background: color.croc, color: color.paper, padding: "24px", textAlign: "center" }}>
-        <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.1rem", margin: "0 0 8px" }}>Raffle created</p>
+        <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.1rem", margin: "0 0 8px" }}>
+          Raffle created — {validPrizeRows.length} prize{validPrizeRows.length > 1 ? "s" : ""}
+        </p>
         <p style={{ fontFamily: font.mono, fontSize: "0.76rem", opacity: 0.9 }}>It'll appear in the list below.</p>
         <button
           onClick={onCreated}
@@ -96,14 +132,44 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
 
       <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: "16px" }}>
         <div>
-          <p style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkSoft, margin: "0 0 6px" }}>Prize NFT contract</p>
-          <input value={nftContract} onChange={(e) => setNftContract(e.target.value)} placeholder="0x…" style={inputStyle} spellCheck={false} />
-          {nftContract && !validNft && <p style={{ fontFamily: font.mono, fontSize: "0.66rem", color: color.tongue, margin: "6px 0 0" }}>Not a valid address.</p>}
-        </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "10px" }}>
+            <p style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkSoft, margin: 0 }}>
+              Prizes ({prizes.length})
+            </p>
+            <button
+              onClick={addPrize}
+              style={{ fontFamily: font.mono, fontSize: "0.68rem", background: "none", border: "none", color: color.croc, cursor: "pointer", textDecoration: "underline" }}
+            >
+              + Add another prize
+            </button>
+          </div>
 
-        <div>
-          <p style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkSoft, margin: "0 0 6px" }}>Token ID</p>
-          <input value={tokenId} onChange={(e) => setTokenId(e.target.value)} placeholder="1" style={inputStyle} />
+          {prizes.map((row, i) => (
+            <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "flex-start" }}>
+              <input
+                value={row.nftContract}
+                onChange={(e) => updatePrize(i, "nftContract", e.target.value)}
+                placeholder="NFT contract 0x…"
+                style={{ ...inputStyle, flex: 2 }}
+                spellCheck={false}
+              />
+              <input
+                value={row.tokenId}
+                onChange={(e) => updatePrize(i, "tokenId", e.target.value)}
+                placeholder="Token ID"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              {prizes.length > 1 && (
+                <button
+                  onClick={() => removePrize(i)}
+                  aria-label="Remove prize"
+                  style={{ width: "42px", height: "42px", flexShrink: 0, border: RULE, background: color.paper, cursor: "pointer", fontSize: "1.1rem" }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          ))}
         </div>
 
         <div>
@@ -137,34 +203,49 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
           <span>{creationFee !== undefined ? `${formatEther(creationFee)} ETH` : "—"}</span>
         </div>
 
-        {!isApproved ? (
-          <button
-            onClick={approve}
-            disabled={!canApprove || approveWrite.isPending || approveReceipt.isLoading}
-            className={canApprove ? "press" : undefined}
-            style={{
-              width: "100%", padding: "13px", border: RULE, cursor: canApprove ? "pointer" : "not-allowed",
-              background: canApprove ? color.sun : color.paperDeep, color: color.ink,
-              fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem",
-            }}
-          >
-            {approveWrite.isPending ? "Confirm in wallet…" : approveReceipt.isLoading ? "Approving…" : "1. Approve NFT transfer"}
-          </button>
-        ) : (
-          <button
-            onClick={create}
-            disabled={!canCreate || createWrite.isPending || createReceipt.isLoading}
-            className={canCreate ? "press" : undefined}
-            style={{
-              width: "100%", padding: "13px", border: RULE, cursor: canCreate ? "pointer" : "not-allowed",
-              background: canCreate ? color.ink : color.paperDeep, color: canCreate ? color.paper : color.inkFaint,
-              fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem",
-              boxShadow: canCreate ? offset(color.croc, 4, 4) : "none",
-            }}
-          >
-            {createWrite.isPending ? "Confirm in wallet…" : createReceipt.isLoading ? "Creating…" : "2. Deposit & create raffle"}
-          </button>
+        {/* per-contract approvals */}
+        {uniqueContracts.length > 0 && (
+          <div>
+            <p style={{ fontFamily: font.mono, fontSize: "0.64rem", letterSpacing: "0.1em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 8px" }}>
+              1. Approve each collection
+            </p>
+            {approvalStatus.map(({ contract, approved }) => (
+              <div key={contract} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", border: RULE, marginBottom: "6px", background: approved ? color.paperDeep : color.paper }}>
+                <span style={{ fontFamily: font.mono, fontSize: "0.74rem" }}>
+                  {contract.slice(0, 6)}…{contract.slice(-4)}
+                </span>
+                {approved ? (
+                  <span style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.croc }}>Approved</span>
+                ) : (
+                  <button
+                    onClick={() => approveContract(contract)}
+                    disabled={approvalInFlight}
+                    className="press"
+                    style={{ padding: "6px 14px", border: RULE, background: color.sun, cursor: approvalInFlight ? "not-allowed" : "pointer", fontFamily: font.mono, fontSize: "0.68rem" }}
+                  >
+                    {approvingContract === contract && approvalInFlight
+                      ? (approveWrite.isPending ? "Confirm…" : "Approving…")
+                      : "Approve"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         )}
+
+        <button
+          onClick={create}
+          disabled={!canCreate || createWrite.isPending || createReceipt.isLoading}
+          className={canCreate ? "press" : undefined}
+          style={{
+            width: "100%", padding: "13px", border: RULE, cursor: canCreate ? "pointer" : "not-allowed",
+            background: canCreate ? color.ink : color.paperDeep, color: canCreate ? color.paper : color.inkFaint,
+            fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem",
+            boxShadow: canCreate ? offset(color.croc, 4, 4) : "none",
+          }}
+        >
+          {createWrite.isPending ? "Confirm in wallet…" : createReceipt.isLoading ? "Creating…" : "2. Deposit & create raffle"}
+        </button>
 
         {(approveWrite.error || createWrite.error) && (
           <p style={{ fontFamily: font.mono, fontSize: "0.7rem", color: color.tongue }}>
@@ -173,8 +254,9 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
         )}
 
         <p style={{ fontFamily: font.mono, fontSize: "0.64rem", color: color.inkFaint, lineHeight: 1.5, margin: 0 }}>
-          Approving lets the raffle contract move this one specific token — it doesn't touch anything else in your wallet.
-          The NFT moves into escrow the moment you create the raffle, not before.
+          Approving a collection lets the raffle contract move ANY token you own from it, not just the ones listed
+          above — this is what makes raffling several tokens from the same collection a single approval instead of
+          one per token. You can revoke it anytime after. Nothing actually moves until you create the raffle.
         </p>
       </div>
     </div>
