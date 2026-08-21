@@ -1,4 +1,4 @@
-export const SHUFFLER_RAFFLE_ADDRESS = "0xb7E8433cb8E0dba056B6ecC5E6702F196ec302b2";
+export const SHUFFLER_RAFFLE_ADDRESS = "0xf1C734a99a74F1e64748dC80aA05b72b178EE0D3";
 export const SHUFFLER_REGISTRY_ADDRESS = "0xF14fbA500f5C06604b4819fA30899aAad6563E92";
 
 export const ELIGIBILITY = { PUBLIC: 0, HOLDER_GATED: 1 } as const;
@@ -47,6 +47,9 @@ export const SHUFFLER_RAFFLE_ABI = [
     outputs: [{ type: "uint256" }],
   },
   { type: "function", name: "enterRaffle", stateMutability: "payable", inputs: [{ type: "uint256" }], outputs: [] },
+  { type: "function", name: "cancelRaffle", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] },
+  { type: "function", name: "claimRefund", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] },
+  { type: "function", name: "getRefundOwed", stateMutability: "view", inputs: [{ type: "uint256" }, { type: "address" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "requestDraw", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] },
   { type: "function", name: "executeDraw", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] },
   { type: "function", name: "reclaimUnusedPrizes", stateMutability: "nonpayable", inputs: [{ type: "uint256" }], outputs: [] },
