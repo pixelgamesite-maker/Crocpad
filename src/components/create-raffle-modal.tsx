@@ -40,6 +40,31 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
   // setApprovalForAll covers every token from that contract in one shot.
   const uniqueContracts = Array.from(new Set(validPrizeRows.map((p) => p.nftContract.toLowerCase())));
 
+  // Approving a collection never checks ownership — it just grants
+  // permission. Without this check, a bad token ID only surfaces after
+  // paying gas for a reverted createRaffle call, which is exactly what
+  // happened before this was added. Every listed prize gets verified
+  // against the connected wallet before Create is ever clickable.
+  const { data: ownerData } = useReadContracts({
+    contracts: validPrizeRows.map((p) => ({
+      address: p.nftContract as `0x${string}`,
+      abi: ERC721_MIN_ABI,
+      functionName: "ownerOf",
+      args: [BigInt(p.tokenId)],
+    })),
+    query: { enabled: isConnected && validPrizeRows.length > 0 },
+  });
+
+  const ownershipStatus = validPrizeRows.map((p, i) => {
+    const result = ownerData?.[i];
+    if (!result || result.status !== "success") return { ...p, checked: false, owned: false };
+    const owner = result.result as string;
+    return { ...p, checked: true, owned: owner.toLowerCase() === address?.toLowerCase() };
+  });
+  const allOwnershipChecked = ownershipStatus.length > 0 && ownershipStatus.every((s) => s.checked);
+  const allOwned = allOwnershipChecked && ownershipStatus.every((s) => s.owned);
+
+
   const { data: creationFeeData } = useReadContracts({
     contracts: [{ address: SHUFFLER_RAFFLE_ADDRESS, abi: SHUFFLER_RAFFLE_ABI, functionName: "creationFee" }],
   });
@@ -101,7 +126,7 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
     });
   }
 
-  const canCreate = isConnected && allRowsValid && validGating && validDuration && allApproved;
+  const canCreate = isConnected && allRowsValid && validGating && validDuration && allApproved && allOwned;
   const approvalInFlight = approveWrite.isPending || approveReceipt.isLoading;
 
   if (createReceipt.isSuccess) {
@@ -144,37 +169,50 @@ export default function CreateRaffleForm({ onCreated }: { onCreated: () => void 
             </button>
           </div>
 
-          {prizes.map((row, i) => (
-            <div key={i} style={{ display: "flex", gap: "8px", marginBottom: "8px", alignItems: "flex-start" }}>
-              <input
-                value={row.nftContract}
-                onChange={(e) => updatePrize(i, "nftContract", e.target.value)}
-                placeholder="NFT contract 0x…"
-                style={{ ...inputStyle, flex: 2 }}
-                spellCheck={false}
-              />
-              <input
-                value={row.tokenId}
-                onChange={(e) => updatePrize(i, "tokenId", e.target.value)}
-                placeholder="Token ID"
-                style={{ ...inputStyle, flex: 1 }}
-              />
-              {prizes.length > 1 && (
-                <button
-                  onClick={() => removePrize(i)}
-                  aria-label="Remove prize"
-                  style={{ width: "42px", height: "42px", flexShrink: 0, border: RULE, background: color.paper, cursor: "pointer", fontSize: "1.1rem" }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-          ))}
+          {prizes.map((row, i) => {
+            const status = ownershipStatus.find((s) => s.nftContract === row.nftContract && s.tokenId === row.tokenId);
+            return (
+              <div key={i}>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "4px", alignItems: "flex-start" }}>
+                  <input
+                    value={row.nftContract}
+                    onChange={(e) => updatePrize(i, "nftContract", e.target.value)}
+                    placeholder="NFT contract 0x…"
+                    style={{ ...inputStyle, flex: 2 }}
+                    spellCheck={false}
+                  />
+                  <input
+                    value={row.tokenId}
+                    onChange={(e) => updatePrize(i, "tokenId", e.target.value)}
+                    placeholder="Token ID"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  {prizes.length > 1 && (
+                    <button
+                      onClick={() => removePrize(i)}
+                      aria-label="Remove prize"
+                      style={{ width: "42px", height: "42px", flexShrink: 0, border: RULE, background: color.paper, cursor: "pointer", fontSize: "1.1rem" }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                {status && (
+                  <p style={{ fontFamily: font.mono, fontSize: "0.66rem", margin: "0 0 8px", color: !status.checked ? color.inkFaint : status.owned ? color.croc : color.tongue }}>
+                    {!status.checked ? "Checking ownership…" : status.owned ? "✓ Owned by your wallet" : "✕ Not owned by your wallet — this would fail on-chain"}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div>
           <p style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkSoft, margin: "0 0 6px" }}>Duration (days)</p>
-          <input type="number" min="0.04" step="0.5" value={days} onChange={(e) => setDays(e.target.value)} style={inputStyle} />
+          <input type="number" min="0.0417" step="0.5" value={days} onChange={(e) => setDays(e.target.value)} style={inputStyle} />
+          <p style={{ fontFamily: font.mono, fontSize: "0.64rem", color: color.inkFaint, margin: "6px 0 0" }}>
+            Minimum 1 hour (≈0.042 days), maximum 30 days.
+          </p>
         </div>
 
         <div>
