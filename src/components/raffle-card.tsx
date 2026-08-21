@@ -3,6 +3,7 @@ import { useAccount, useReadContract, useReadContracts, useBlockNumber, useWrite
 import { formatEther } from "viem";
 import { color, font, RULE, offset } from "@/lib/theme";
 import { SHUFFLER_RAFFLE_ADDRESS, SHUFFLER_RAFFLE_ABI, ELIGIBILITY, RAFFLE_STATUS } from "@/lib/shufflerRaffleContract";
+import { usePrizeMetadata } from "@/lib/usePrizeMetadata";
 
 function short(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -13,9 +14,11 @@ function formatCountdown(seconds: number) {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
   if (d > 0) return `${d}d ${h}h left`;
   if (h > 0) return `${h}h ${m}m left`;
-  return `${m}m left`;
+  if (m > 0) return `${m}m ${s}s left`;
+  return `${s}s left`;
 }
 
 const STATUS_LABEL: Record<number, string> = {
@@ -24,6 +27,22 @@ const STATUS_LABEL: Record<number, string> = {
   [RAFFLE_STATUS.COMPLETE]: "Complete",
   [RAFFLE_STATUS.CANCELLED]: "Cancelled",
 };
+
+function PrizeImage({ nftContract, tokenId }: { nftContract: string; tokenId: bigint }) {
+  const { loading, image, error } = usePrizeMetadata(nftContract, tokenId);
+
+  if (image && !error) {
+    return <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+  }
+
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: color.paperDeep }}>
+      <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.inkFaint, textAlign: "center", padding: "0 16px" }}>
+        {loading ? "Loading…" : "Preview unavailable"}
+      </p>
+    </div>
+  );
+}
 
 export default function RaffleCard({ raffleId }: { raffleId: bigint }) {
   const { address, isConnected } = useAccount();
@@ -42,8 +61,12 @@ export default function RaffleCard({ raffleId }: { raffleId: bigint }) {
     query: { refetchInterval: 15000 },
   });
 
-  const [summary, prizes, entryFee, alreadyEntered] = data?.map((d) => d.result) ?? [];
+  const [summary, prizesData, entryFee, alreadyEntered] = data?.map((d) => d.result) ?? [];
   const [creator, eligibility, gatingCollection, endTime, status, prizeCount, entrantCount] = summary ?? [];
+  const prizes = (prizesData ?? []) as { nftContract: string; tokenId: bigint }[];
+  const heroPrize = prizes[0];
+
+  const heroMeta = usePrizeMetadata(heroPrize?.nftContract ?? "", heroPrize?.tokenId ?? 0n);
 
   const { data: drawRequest } = useReadContract({
     address: SHUFFLER_RAFFLE_ADDRESS,
@@ -93,16 +116,14 @@ export default function RaffleCard({ raffleId }: { raffleId: bigint }) {
   const isEligible = isPublic || (eligibleHolderBalance !== undefined && Number(eligibleHolderBalance) > 0);
   const timeUp = secondsLeft !== null && secondsLeft <= 0;
   const canDrawExecute = targetBlock !== undefined && blockNumber !== undefined && !fulfilled && blockNumber > targetBlock;
-  const isWinnerList = winners as readonly string[] | undefined;
-  const iAmWinner = isWinnerList?.some((w) => w.toLowerCase() === address?.toLowerCase());
+  const winnerList = winners as readonly string[] | undefined;
+  const iAmWinner = winnerList?.some((w) => w.toLowerCase() === address?.toLowerCase());
   const iAmCreator = creator?.toLowerCase() === address?.toLowerCase();
+  const prizeCountNum = prizeCount !== undefined ? Number(prizeCount) : prizes.length;
 
   function enter() {
     reset();
-    writeContract({
-      address: SHUFFLER_RAFFLE_ADDRESS, abi: SHUFFLER_RAFFLE_ABI, functionName: "enterRaffle",
-      args: [raffleId], value: entryFee ?? 0n,
-    });
+    writeContract({ address: SHUFFLER_RAFFLE_ADDRESS, abi: SHUFFLER_RAFFLE_ABI, functionName: "enterRaffle", args: [raffleId], value: entryFee ?? 0n });
   }
   function requestDraw() {
     reset();
@@ -119,66 +140,66 @@ export default function RaffleCard({ raffleId }: { raffleId: bigint }) {
 
   return (
     <div style={{ border: RULE, background: color.paper, boxShadow: offset(statusNum === RAFFLE_STATUS.COMPLETE ? color.sun : color.croc) }}>
-      <div style={{ padding: "14px 18px", borderBottom: RULE, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-        <span style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.02rem" }}>Raffle #{raffleId.toString()}</span>
-        <span style={{ fontFamily: font.mono, fontSize: "0.64rem", letterSpacing: "0.1em", textTransform: "uppercase", padding: "5px 11px", border: RULE, background: statusNum === RAFFLE_STATUS.ACTIVE ? color.croc : color.paper, color: statusNum === RAFFLE_STATUS.ACTIVE ? color.paper : color.ink }}>
-          {STATUS_LABEL[statusNum]}
-        </span>
-      </div>
+      {/* hero image */}
+      {heroPrize && (
+        <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", borderBottom: RULE, overflow: "hidden" }}>
+          <PrizeImage nftContract={heroPrize.nftContract} tokenId={heroPrize.tokenId} />
+          <span style={{ position: "absolute", top: "10px", right: "10px", fontFamily: font.mono, fontSize: "0.68rem", fontWeight: 600, padding: "5px 10px", background: color.ink, color: color.paper, border: `1px solid ${color.ink}` }}>
+            #{heroPrize.tokenId.toString()}
+          </span>
+          {prizeCountNum > 1 && (
+            <span style={{ position: "absolute", top: "10px", left: "10px", fontFamily: font.mono, fontSize: "0.64rem", padding: "5px 10px", background: color.sun, color: color.ink, border: RULE }}>
+              +{prizeCountNum - 1} more
+            </span>
+          )}
+          <span style={{ position: "absolute", bottom: "10px", left: "10px", fontFamily: font.mono, fontSize: "0.64rem", letterSpacing: "0.1em", textTransform: "uppercase", padding: "5px 10px", background: statusNum === RAFFLE_STATUS.ACTIVE ? color.croc : color.paper, color: statusNum === RAFFLE_STATUS.ACTIVE ? color.paper : color.ink, border: RULE }}>
+            {STATUS_LABEL[statusNum]}
+          </span>
+        </div>
+      )}
 
       <div style={{ padding: "16px 18px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: "0.76rem", marginBottom: "6px" }}>
-          <span style={{ color: color.inkSoft }}>Prizes</span>
-          <span>{prizeCount !== undefined ? Number(prizeCount) : "—"}</span>
+        <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.05rem", margin: "0 0 4px" }}>
+          {heroMeta.name ?? `Raffle #${raffleId.toString()}`}
+        </p>
+        <p style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkFaint, margin: "0 0 14px" }}>
+          {short(heroPrize?.nftContract ?? "")}
+        </p>
+
+        <div style={{ display: "flex", gap: "10px", marginBottom: "14px" }}>
+          <div style={{ flex: 1, border: RULE, padding: "8px 10px" }}>
+            <p style={{ fontFamily: font.mono, fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 3px" }}>Entrants</p>
+            <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.05rem", margin: 0 }}>{entrantCount !== undefined ? Number(entrantCount) : "—"}</p>
+          </div>
+          <div style={{ flex: 1, border: RULE, padding: "8px 10px" }}>
+            <p style={{ fontFamily: font.mono, fontSize: "0.6rem", letterSpacing: "0.08em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 3px" }}>Cost</p>
+            <p style={{ fontFamily: font.display, fontWeight: 700, fontSize: "1.05rem", margin: 0 }}>{entryFee ? `${formatEther(entryFee)} Ξ` : "Free"}</p>
+          </div>
         </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: "0.76rem", marginBottom: "6px" }}>
-          <span style={{ color: color.inkSoft }}>Entrants</span>
-          <span>{entrantCount !== undefined ? Number(entrantCount) : "—"}</span>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontFamily: font.mono, fontSize: "0.76rem", marginBottom: "6px" }}>
-          <span style={{ color: color.inkSoft }}>Eligibility</span>
-          <span>{isPublic ? "Public" : `Holders of ${short(gatingCollection as string)}`}</span>
-        </div>
-        {prizes && prizes.length > 0 && (
-          <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${color.paperDeep}` }}>
-            {(prizes as { nftContract: string; tokenId: bigint }[]).map((p, i) => (
-              <p key={i} style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkSoft, margin: "2px 0" }}>
-                {short(p.nftContract)} · #{p.tokenId.toString()}
-              </p>
-            ))}
+
+        <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.inkSoft, margin: "0 0 14px" }}>
+          {isPublic ? "Open to everyone" : `Holders of ${short(gatingCollection as string)} only`}
+        </p>
+
+        {statusNum === RAFFLE_STATUS.ACTIVE && (
+          <div style={{ border: RULE, background: timeUp ? color.paperDeep : color.ink, padding: "10px 12px", textAlign: "center", marginBottom: "14px" }}>
+            <p style={{ fontFamily: font.mono, fontSize: "0.9rem", fontWeight: 600, margin: 0, color: timeUp ? color.tongue : color.sun }}>
+              {secondsLeft !== null ? formatCountdown(secondsLeft) : "—"}
+            </p>
           </div>
         )}
 
-        {statusNum === RAFFLE_STATUS.ACTIVE && (
-          <p style={{ fontFamily: font.mono, fontSize: "0.8rem", fontWeight: 600, margin: "14px 0 0", color: timeUp ? color.tongue : color.ink }}>
-            {secondsLeft !== null ? formatCountdown(secondsLeft) : "—"}
-          </p>
-        )}
-      </div>
-
-      <div style={{ padding: "0 18px 18px" }}>
         {statusNum === RAFFLE_STATUS.ACTIVE && !timeUp && (
           <>
             {alreadyEntered ? (
-              <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.croc, textAlign: "center", padding: "12px" }}>
-                You're entered
-              </p>
+              <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.croc, textAlign: "center", padding: "12px", border: RULE }}>You're entered</p>
             ) : !isConnected ? (
-              <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.inkFaint, textAlign: "center", padding: "12px" }}>
-                Connect wallet to enter
-              </p>
+              <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.inkFaint, textAlign: "center", padding: "12px", border: RULE }}>Connect wallet to enter</p>
             ) : !isEligible ? (
-              <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.tongue, textAlign: "center", padding: "12px" }}>
-                Wallet not eligible for this raffle
-              </p>
+              <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.tongue, textAlign: "center", padding: "12px", border: RULE }}>Wallet not eligible</p>
             ) : (
-              <button
-                onClick={enter}
-                disabled={isPending || confirming}
-                className="press"
-                style={{ width: "100%", padding: "13px", border: RULE, background: color.ink, color: color.paper, fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" }}
-              >
-                {isPending ? "Confirm in wallet…" : confirming ? "Entering…" : `Enter${entryFee ? ` (${formatEther(entryFee)} ETH)` : " (free)"}`}
+              <button onClick={enter} disabled={isPending || confirming} className="press" style={{ width: "100%", padding: "13px", border: RULE, background: color.ink, color: color.paper, fontFamily: font.display, fontWeight: 700, fontSize: "0.9rem", cursor: "pointer" }}>
+                {isPending ? "Confirm in wallet…" : confirming ? "Entering…" : "Enter raffle"}
               </button>
             )}
           </>
@@ -196,30 +217,36 @@ export default function RaffleCard({ raffleId }: { raffleId: bigint }) {
               {isPending ? "Confirm…" : confirming ? "Drawing…" : "Execute draw"}
             </button>
           ) : (
-            <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.inkFaint, textAlign: "center", padding: "12px" }}>
-              Waiting for the random seed block to be mined…
-            </p>
+            <p style={{ fontFamily: font.mono, fontSize: "0.72rem", color: color.inkFaint, textAlign: "center", padding: "12px" }}>Waiting for the random seed block…</p>
           )
         )}
 
-        {statusNum === RAFFLE_STATUS.COMPLETE && isWinnerList && (
+        {statusNum === RAFFLE_STATUS.COMPLETE && winnerList && (
           <div>
-            <p style={{ fontFamily: font.mono, fontSize: "0.7rem", letterSpacing: "0.08em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 8px" }}>
-              Winners
-            </p>
-            {isWinnerList.map((w, i) => (
+            <p style={{ fontFamily: font.mono, fontSize: "0.7rem", letterSpacing: "0.08em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 8px" }}>Winners</p>
+            {winnerList.map((w, i) => (
               <p key={i} style={{ fontFamily: font.mono, fontSize: "0.78rem", margin: "2px 0", color: w.toLowerCase() === address?.toLowerCase() ? color.croc : color.ink, fontWeight: w.toLowerCase() === address?.toLowerCase() ? 700 : 400 }}>
                 {short(w)} {w.toLowerCase() === address?.toLowerCase() && "← you"}
               </p>
             ))}
-            {iAmWinner && <p style={{ fontFamily: font.mono, fontSize: "0.76rem", color: color.croc, marginTop: "10px" }}>Prize sent to your wallet.</p>}
           </div>
         )}
 
         {(statusNum === RAFFLE_STATUS.CANCELLED || statusNum === RAFFLE_STATUS.COMPLETE) && iAmCreator && (
-          <button onClick={reclaim} disabled={isPending || confirming} className="press" style={{ width: "100%", marginTop: "10px", padding: "11px", border: RULE, background: color.paper, color: color.ink, fontFamily: font.mono, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>
+          <button onClick={reclaim} disabled={isPending || confirming} className="press" style={{ width: "100%", marginTop: "10px", padding: "11px", border: RULE, background: color.paper, fontFamily: font.mono, fontSize: "0.72rem", letterSpacing: "0.06em", textTransform: "uppercase", cursor: "pointer" }}>
             Reclaim unused prizes
           </button>
+        )}
+
+        {prizes.length > 1 && (
+          <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: `1px solid ${color.paperDeep}` }}>
+            <p style={{ fontFamily: font.mono, fontSize: "0.62rem", letterSpacing: "0.08em", textTransform: "uppercase", color: color.inkSoft, margin: "0 0 6px" }}>All prizes</p>
+            {prizes.map((p, i) => (
+              <p key={i} style={{ fontFamily: font.mono, fontSize: "0.68rem", color: color.inkSoft, margin: "2px 0" }}>
+                {short(p.nftContract)} · #{p.tokenId.toString()}
+              </p>
+            ))}
+          </div>
         )}
 
         {writeError && (
