@@ -10,13 +10,13 @@ type NavItem = { label: string; href: string; live: boolean };
  *  holding unlocks, then the reference material. */
 export const NAV: NavItem[] = [
   { label: "Mint", href: "/mint", live: true },
+  { label: "Shuffler", href: "/shuffler", live: true },
+  { label: "Docs", href: "/docs", live: true },
   { label: "Vault", href: "/vault", live: false },
   { label: "Staking", href: "/staking", live: false },
   { label: "Traits", href: "/traits", live: false },
-  { label: "Shuffler", href: "/shuffler", live: false },
   { label: "Token", href: "/token", live: false },
   { label: "Economy", href: "/economy", live: false },
-  { label: "Docs", href: "/docs", live: true },
 ];
 
 function IconX({ size = 15 }: { size?: number }) {
